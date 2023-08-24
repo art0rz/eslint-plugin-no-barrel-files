@@ -22,6 +22,10 @@ ruleTester.run('no-barrel-files', noBarrelFiles, {
       errors: [{ messageId: 'noExportAll' }],
     },
     {
+      code: 'export * as Foo from "./foo"',
+      errors: [{ messageId: 'noExportAll' }],
+    },
+    {
       code: `
       import Foo from "./foo";
       export default Foo;
