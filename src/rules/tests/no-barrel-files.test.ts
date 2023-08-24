@@ -41,5 +41,11 @@ ruleTester.run('no-barrel-files', noBarrelFiles, {
       `,
       errors: [{ messageId: 'noReExport' }],
     },
+    {
+      code: `
+      export { default as Moo } from './Moo';
+      `,
+      errors: [{ messageId: 'noReExport' }],
+    },
   ],
 });
