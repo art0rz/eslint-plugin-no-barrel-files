@@ -2,7 +2,7 @@ import { TSESLint } from '@typescript-eslint/utils';
 
 type MessageIds = 'noReExport' | 'noExportAll';
 
-const myRule: TSESLint.RuleModule<MessageIds> = {
+const noBarrelFiles: TSESLint.RuleModule<MessageIds> = {
   defaultOptions: [],
   meta: {
     type: 'suggestion',
@@ -38,6 +38,16 @@ const myRule: TSESLint.RuleModule<MessageIds> = {
         });
       },
       ExportNamedDeclaration(node) {
+        if (node?.source?.type === 'Literal') {
+          context.report({
+            node,
+            messageId: 'noReExport',
+            data: {
+              name: node.source.value,
+            },
+          });
+        }
+
         node.specifiers.forEach(specifier => {
           if (declaredImports.includes(specifier.exported.name)) {
             context.report({
@@ -59,4 +69,4 @@ const myRule: TSESLint.RuleModule<MessageIds> = {
   },
 };
 
-export default myRule;
+export default noBarrelFiles;

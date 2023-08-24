@@ -1,11 +1,11 @@
 import { RuleTester } from '@typescript-eslint/rule-tester';
-import myRule from '../no-barrel-files';
+import noBarrelFiles from '../no-barrel-files';
 
 const ruleTester = new RuleTester({
   parser: '@typescript-eslint/parser',
 });
 
-ruleTester.run('no-barrel-files', myRule, {
+ruleTester.run('no-barrel-files', noBarrelFiles, {
   valid: [
     `
       const Foo = 'baz';
@@ -24,11 +24,22 @@ ruleTester.run('no-barrel-files', myRule, {
     {
       code: `
       import Foo from "./foo";
-      import Bar from "./bar";
       export default Foo;
-      export { Bar };
       `,
-      errors: [{ messageId: 'noReExport' }, { messageId: 'noReExport' }],
+      errors: [{ messageId: 'noReExport' }],
+    },
+    {
+      code: `
+      import Foo from "./foo";
+      export { Foo };
+      `,
+      errors: [{ messageId: 'noReExport' }],
+    },
+    {
+      code: `
+      export { Moo } from './Moo';
+      `,
+      errors: [{ messageId: 'noReExport' }],
     },
   ],
 });
