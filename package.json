@@ -1,0 +1,22 @@
+{
+  "name": "eslint-rule-no-barrel-files",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@typescript-eslint/parser": "^6.4.1",
+    "@typescript-eslint/rule-tester": "^6.4.1",
+    "typescript": "^5.1.6",
+    "vitest": "^0.34.2"
+  },
+  "dependencies": {
+    "@typescript-eslint/utils": "^6.4.1"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "strict": true,
+    "outDir": "dist",
+    "sourceMap": true,
+    "inlineSources": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "lib": ["esnext"],
+    "incremental": true,
+    "declaration": true,
+    "declarationMap": true,
+    "rootDir": "src",
+    "skipLibCheck": true,
+    "module": "commonjs",
+    "target": "es6",
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "moduleResolution": "nodenext",
+  }
+}

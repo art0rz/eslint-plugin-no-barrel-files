@@ -1,0 +1,4 @@
+dist
+*.tsbuildinfo
+node_modules
+.idea
