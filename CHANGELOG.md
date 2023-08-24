@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/v1.0.0...v1.1.0) (2023-08-24)
+
+
+### Features
+
+* additional test ([2fd3a0f](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/2fd3a0f97127a682d3cf6646943aed31f18fd8bd))
+
 # 1.0.0 (2023-08-24)
 
 
