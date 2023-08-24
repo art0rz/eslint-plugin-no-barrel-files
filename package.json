@@ -12,7 +12,16 @@
   "files": [
     "dist"
   ],
-  "keywords": [],
+  "keywords": [
+    "eslint",
+    "plugin",
+    "addon",
+    "extension",
+    "rule",
+    "barrel",
+    "import",
+    "export"
+  ],
   "author": "art0rz",
   "license": "ISC",
   "devDependencies": {
