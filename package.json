@@ -16,6 +16,11 @@
   "author": "art0rz",
   "license": "ISC",
   "devDependencies": {
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^10.0.1",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/npm": "^10.0.5",
+    "@semantic-release/release-notes-generator": "^11.0.4",
     "@typescript-eslint/eslint-plugin": "^6.4.1",
     "@typescript-eslint/parser": "^6.4.1",
     "@typescript-eslint/rule-tester": "^6.4.1",
@@ -28,9 +33,9 @@
     "eslint-plugin-import": "^2.28.1",
     "eslint-plugin-prettier": "^5.0.0",
     "prettier": "3.0.2",
+    "semantic-release": "^21.1.0",
     "typescript": "^5.1.6",
-    "vitest": "^0.34.2",
-    "semantic-release": "^21.1.0"
+    "vitest": "^0.34.2"
   },
   "dependencies": {
     "@typescript-eslint/utils": "^6.4.1"
