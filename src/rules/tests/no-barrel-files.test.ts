@@ -5,16 +5,30 @@ const ruleTester = new RuleTester({
   parser: '@typescript-eslint/parser',
 });
 
-ruleTester.run('my-rule', myRule, {
-  valid: ['notFooBar()', 'const foo = 2', 'const bar = 2'],
+ruleTester.run('no-barrel-files', myRule, {
+  valid: [
+    `
+      const Foo = 'baz';
+      function Bar() {}
+      class Baz {}
+      
+      export default Foo;
+      export { Bar, Baz }
+`,
+  ],
   invalid: [
     {
-      code: 'foo()',
-      errors: [{ messageId: 'messageIdForSomeFailure' }],
+      code: 'export * from "./foo"',
+      errors: [{ messageId: 'noExportAll' }],
     },
     {
-      code: 'bar()',
-      errors: [{ messageId: 'messageIdForSomeOtherFailure' }],
+      code: `
+      import Foo from "./foo";
+      import Bar from "./bar";
+      export default Foo;
+      export { Bar };
+      `,
+      errors: [{ messageId: 'noReExport' }, { messageId: 'noReExport' }],
     },
   ],
 });

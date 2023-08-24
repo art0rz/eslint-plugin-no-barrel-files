@@ -1,6 +1,6 @@
-import { TSESLint, AST_NODE_TYPES } from '@typescript-eslint/utils';
+import { TSESLint } from '@typescript-eslint/utils';
 
-type MessageIds = 'messageIdForSomeFailure' | 'messageIdForSomeOtherFailure';
+type MessageIds = 'noReExport' | 'noExportAll';
 
 const myRule: TSESLint.RuleModule<MessageIds> = {
   defaultOptions: [],
@@ -10,35 +10,50 @@ const myRule: TSESLint.RuleModule<MessageIds> = {
       url: '',
       description: 'require foo',
     },
-    fixable: 'code',
     schema: [],
     messages: {
-      messageIdForSomeFailure: 'Error message for some failure',
-      messageIdForSomeOtherFailure: 'Error message for some other failure',
+      noReExport: 'Do not re-export imported variable (`{{name}}`)',
+      noExportAll: 'Do not use export all (`export * from ...`)',
     },
   },
   create(context) {
-    // declare the state of the rule
+    const declaredImports: Array<string> = [];
 
     return {
-      CallExpression(node) {
-        // we only care about the callees that have a name (see below)
-        if (node.callee.type !== AST_NODE_TYPES.Identifier) {
-          return;
-        }
-
-        if (node.callee.name === 'foo') {
+      ExportDefaultDeclaration(node) {
+        if (node.declaration.type === 'Identifier' && declaredImports.includes(node.declaration.name)) {
           context.report({
-            node: node.callee,
-            messageId: 'messageIdForSomeFailure',
+            node,
+            messageId: 'noReExport',
+            data: {
+              name: node.declaration.name,
+            },
           });
         }
-        if (node.callee.name === 'bar') {
-          context.report({
-            node: node.callee,
-            messageId: 'messageIdForSomeOtherFailure',
-          });
-        }
+      },
+      ExportAllDeclaration(node) {
+        context.report({
+          node,
+          messageId: 'noExportAll',
+        });
+      },
+      ExportNamedDeclaration(node) {
+        node.specifiers.forEach(specifier => {
+          if (declaredImports.includes(specifier.exported.name)) {
+            context.report({
+              node: specifier,
+              messageId: 'noReExport',
+              data: {
+                name: specifier.exported.name,
+              },
+            });
+          }
+        });
+      },
+      ImportDeclaration(node) {
+        node.specifiers.forEach(item => {
+          declaredImports.push(item.local.name);
+        });
       },
     };
   },
