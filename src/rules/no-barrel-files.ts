@@ -6,15 +6,20 @@ const myRule: TSESLint.RuleModule<MessageIds> = {
   defaultOptions: [],
   meta: {
     type: 'suggestion',
+    docs: {
+      url: '',
+      description: 'require foo',
+    },
+    fixable: 'code',
+    schema: [],
     messages: {
       messageIdForSomeFailure: 'Error message for some failure',
       messageIdForSomeOtherFailure: 'Error message for some other failure',
     },
-    fixable: 'code',
-    schema: [], // no options
   },
   create(context) {
     // declare the state of the rule
+
     return {
       CallExpression(node) {
         // we only care about the callees that have a name (see below)
