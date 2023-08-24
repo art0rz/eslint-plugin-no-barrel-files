@@ -52,3 +52,4 @@ module.exports = {
 
 ## Contributing
 If you need any additional features or you find a bug, feel free to submit a pull request or submit an issue.
+
