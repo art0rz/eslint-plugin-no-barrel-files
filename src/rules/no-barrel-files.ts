@@ -7,8 +7,8 @@ const noBarrelFiles: TSESLint.RuleModule<MessageIds> = {
   meta: {
     type: 'suggestion',
     docs: {
-      url: '',
-      description: 'require foo',
+      url: 'https://github.com/art0rz/eslint-plugin-no-barrel-files',
+      description: 'disallow barrel files',
     },
     schema: [],
     messages: {
