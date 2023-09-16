@@ -14,7 +14,11 @@ ruleTester.run('no-barrel-files', noBarrelFiles, {
       
       export default Foo;
       export { Bar, Baz }
-`,
+    `,
+    `
+      import Foo from "./foo";
+      export const Bar = Foo;
+    `,
   ],
   invalid: [
     {
