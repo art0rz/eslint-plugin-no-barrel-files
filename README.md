@@ -31,6 +31,9 @@ class Baz {}
 
 export default Foo;
 export { Bar, Baz }
+
+import { Moo } from './Moo';
+export const Baz = Moo;
 ```
 
 ## Usage
