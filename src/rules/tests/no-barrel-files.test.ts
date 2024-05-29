@@ -8,16 +8,23 @@ const ruleTester = new RuleTester({
 ruleTester.run('no-barrel-files', noBarrelFiles, {
   valid: [
     `
-      const Foo = 'baz';
-      function Bar() {}
-      class Baz {}
-      
+      const Foo = () => {};
+      export { Foo }
+    `,
+    `
+      export const Foo = () => {};
+    `,
+    `
+      const Foo = () => {};
       export default Foo;
-      export { Bar, Baz }
     `,
     `
       import Foo from "./foo";
       export const Bar = Foo;
+    `,
+    `
+      import Foo from './foo';
+      export { Bar as Foo };
     `,
   ],
   invalid: [
@@ -52,6 +59,13 @@ ruleTester.run('no-barrel-files', noBarrelFiles, {
     {
       code: `
       export { default as Moo } from './Moo';
+      `,
+      errors: [{ messageId: 'noReExport' }],
+    },
+    {
+      code: `
+      import Foo from './Moo';
+      export { Foo as Bar };
       `,
       errors: [{ messageId: 'noReExport' }],
     },
