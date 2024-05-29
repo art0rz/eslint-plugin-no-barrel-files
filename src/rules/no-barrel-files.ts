@@ -49,7 +49,7 @@ const noBarrelFiles: TSESLint.RuleModule<MessageIds> = {
         }
 
         node.specifiers.forEach(specifier => {
-          if (declaredImports.includes(specifier.exported.name)) {
+          if (declaredImports.includes(specifier.local.name)) {
             context.report({
               node: specifier,
               messageId: 'noReExport',
