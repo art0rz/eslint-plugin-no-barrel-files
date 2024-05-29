@@ -1,3 +1,10 @@
+## [1.1.1](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/v1.1.0...v1.1.1) (2024-05-29)
+
+
+### Bug Fixes
+
+* [#2](https://github.com/art0rz/eslint-plugin-no-barrel-files/issues/2) with named exports, the exported name instead of the local name would be checked ([86ae096](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/86ae0962f235a2b1a6d6a7467c629060af1b0249))
+
 # [1.1.0](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/v1.0.0...v1.1.0) (2023-08-24)
 
 
