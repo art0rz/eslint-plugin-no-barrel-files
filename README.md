@@ -40,7 +40,7 @@ export const Baz = Moo;
 
 ### Install
 ```shell
-npm i eslint-plugin-no-barrel-files --dev
+npm install eslint-plugin-no-barrel-files --save-dev
 ```
 
 ### ESLint config
