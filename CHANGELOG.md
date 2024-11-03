@@ -1,3 +1,10 @@
+## [1.1.2](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/v1.1.1...v1.1.2) (2024-11-03)
+
+
+### Bug Fixes
+
+* use correct flag for installation ([9784934](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/9784934db8ebe6fe10a175e6b9b7ab9c41057a59))
+
 ## [1.1.1](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/v1.1.0...v1.1.1) (2024-05-29)
 
 
