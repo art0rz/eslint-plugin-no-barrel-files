@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/v1.1.2...v1.2.0) (2024-11-08)
+
+
+### Features
+
+* support flat config ([74ccee8](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/74ccee8fc62b66f66fd5a5a5328ccc1dd5872c13))
+
 ## [1.1.2](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/v1.1.1...v1.1.2) (2024-11-03)
 
 
