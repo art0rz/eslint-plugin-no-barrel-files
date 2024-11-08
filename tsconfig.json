@@ -22,6 +22,5 @@
     "target": "es6",
     "exactOptionalPropertyTypes": true,
     "noUncheckedIndexedAccess": true,
-    "moduleResolution": "nodenext",
   }
 }

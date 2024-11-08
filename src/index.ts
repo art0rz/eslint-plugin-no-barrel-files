@@ -5,5 +5,18 @@ const rules = {
   'no-barrel-files': noBarrelFiles,
 } satisfies Record<string, TSESLint.RuleModule<string, Array<unknown>>>;
 
-// eslint-disable-next-line import/prefer-default-export
-export { rules };
+const plugin = {
+  rules,
+  flat: {
+    plugins: {
+      'no-barrel-files': {
+        rules,
+      },
+    },
+    rules: {
+      'no-barrel-files/no-barrel-files': 'error',
+    },
+  },
+};
+
+module.exports = plugin;

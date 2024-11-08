@@ -1,9 +1,7 @@
 import { RuleTester } from '@typescript-eslint/rule-tester';
 import noBarrelFiles from '../no-barrel-files';
 
-const ruleTester = new RuleTester({
-  parser: '@typescript-eslint/parser',
-});
+const ruleTester = new RuleTester();
 
 ruleTester.run('no-barrel-files', noBarrelFiles, {
   valid: [

@@ -1,4 +1,4 @@
-import { TSESLint } from '@typescript-eslint/utils';
+import { AST_NODE_TYPES, TSESLint } from '@typescript-eslint/utils';
 
 type MessageIds = 'noReExport' | 'noExportAll';
 
@@ -49,7 +49,11 @@ const noBarrelFiles: TSESLint.RuleModule<MessageIds> = {
         }
 
         node.specifiers.forEach(specifier => {
-          if (declaredImports.includes(specifier.local.name)) {
+          if (
+            specifier.local.type === AST_NODE_TYPES.Identifier &&
+            specifier.exported.type === AST_NODE_TYPES.Identifier &&
+            declaredImports.includes(specifier.local.name)
+          ) {
             context.report({
               node: specifier,
               messageId: 'noReExport',
