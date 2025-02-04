@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/v1.2.0...v1.2.1) (2025-02-04)
+
+
+### Bug Fixes
+
+* **module:** [#7](https://github.com/art0rz/eslint-plugin-no-barrel-files/issues/7) missing types in build ([e88c6fb](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/e88c6fb4ae0e5efa6d98e664afa7720aa33e51b7))
+
 # [1.2.0](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/v1.1.2...v1.2.0) (2024-11-08)
 
 
