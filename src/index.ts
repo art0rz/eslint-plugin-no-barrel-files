@@ -16,7 +16,7 @@ const plugin = {
     rules: {
       'no-barrel-files/no-barrel-files': 'error',
     },
-  },
+  } satisfies TSESLint.FlatConfig.Config,
 };
 
 export = plugin;
