@@ -1,3 +1,10 @@
+## [1.2.2](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/v1.2.1...v1.2.2) (2025-07-24)
+
+
+### Bug Fixes
+
+* ensure 'error' is inferred as literal type in flat config ([e547a36](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/e547a361470315e6fc278ad00335055c881032f5))
+
 ## [1.2.1](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/v1.2.0...v1.2.1) (2025-02-04)
 
 
