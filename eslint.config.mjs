@@ -11,6 +11,6 @@ export default [
   ...tseslint.configs.recommended,
   prettier,
   {
-    ignores: ['dist'],
+    ignores: ['dist', '**/tests/fixtures/**/*'],
   },
 ];
