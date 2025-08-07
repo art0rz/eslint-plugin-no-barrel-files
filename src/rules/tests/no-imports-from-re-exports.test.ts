@@ -2,7 +2,11 @@ import { RuleTester } from '@typescript-eslint/rule-tester';
 import noImportsFromReExports from '../no-imports-from-re-exports';
 import * as path from 'path';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester({
+  languageOptions: {
+    parser: require('@typescript-eslint/parser'),
+  },
+});
 
 const fixturesDir = path.resolve(__dirname, 'fixtures');
 

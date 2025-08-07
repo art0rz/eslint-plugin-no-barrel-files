@@ -204,7 +204,10 @@ const noImportsFromReExports: TSESLint.RuleModule<MessageIds, [{ aliases?: Recor
 
         for (const specifier of node.specifiers) {
           let specifierName: string | null = null;
-          if (specifier.type === AST_NODE_TYPES.ImportSpecifier) {
+          if (
+            specifier.type === AST_NODE_TYPES.ImportSpecifier &&
+            specifier.imported.type === AST_NODE_TYPES.Identifier
+          ) {
             specifierName = specifier.imported.name;
           } else if (specifier.type === AST_NODE_TYPES.ImportDefaultSpecifier) {
             specifierName = 'default';
