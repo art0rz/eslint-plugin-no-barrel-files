@@ -24,6 +24,7 @@ function resolvePath(importPath: string, basedir: string, aliases: Record<string
         const extensions = ['.ts', '.tsx', '.js', '.jsx', '.json'];
         for (const ext of extensions) {
             if (fs.existsSync(resolvedPath + ext)) {
+                resolveCache[cacheKey] = resolvedPath + ext;
                 return resolvedPath + ext;
             }
         }
@@ -31,21 +32,10 @@ function resolvePath(importPath: string, basedir: string, aliases: Record<string
     }
 
     for (const alias in aliases) {
-        const aliasTarget = aliases[alias];
-        const aliasWithSlash = alias.endsWith('/') ? alias : `${alias}/`;
-        const aliasTargetWithSlash = aliasTarget.endsWith('/') ? aliasTarget : `${aliasTarget}/`;
-
-        if (importPath.startsWith(aliasWithSlash)) {
-            const remainingPath = importPath.substring(aliasWithSlash.length);
-            const resolved = path.resolve(basedir, aliasTargetWithSlash, remainingPath);
+        if (importPath.startsWith(alias)) {
+            const remainingPath = importPath.substring(alias.length);
+            const resolved = path.join(aliases[alias], remainingPath);
             const resolvedPath = resolvePath(resolved, basedir, aliases);
-            if (resolvedPath) {
-                resolveCache[cacheKey] = resolvedPath;
-                return resolvedPath;
-            }
-        } else if (importPath === alias) {
-            const resolved = path.resolve(basedir, aliasTarget);
-             const resolvedPath = resolvePath(resolved, basedir, aliases);
             if (resolvedPath) {
                 resolveCache[cacheKey] = resolvedPath;
                 return resolvedPath;
@@ -70,15 +60,19 @@ function getFileAst(filePath: string): ts.SourceFile | null {
     return ast;
 }
 
-function getOriginalSource(specifierName: string, importedFileAst: ts.SourceFile, resolvedImportPath: string, aliases: Record<string, string>): {source: string, isNamespace: boolean} | null {
+function getOriginalSource(specifierName: string, fileAst: ts.SourceFile, filePath: string, aliases: Record<string, string>): {source: string, isNamespace: boolean} | null {
     let originalSource: {source: string, isNamespace: boolean} | null = null;
 
-    ts.forEachChild(importedFileAst, (fileNode) => {
+    ts.forEachChild(fileAst, (fileNode) => {
         if (ts.isExportDeclaration(fileNode) && fileNode.moduleSpecifier && ts.isStringLiteral(fileNode.moduleSpecifier)) {
             const source = fileNode.moduleSpecifier.text;
             if (fileNode.exportClause && ts.isNamedExports(fileNode.exportClause)) {
                 for (const exportSpecifier of fileNode.exportClause.elements) {
                     if (exportSpecifier.name.text === specifierName) {
+                        originalSource = { source, isNamespace: false };
+                        return;
+                    }
+                    if (specifierName === 'default' && exportSpecifier.name.text === 'default') {
                         originalSource = { source, isNamespace: false };
                         return;
                     }
@@ -90,17 +84,18 @@ function getOriginalSource(specifierName: string, importedFileAst: ts.SourceFile
                 }
             }
             else if (!fileNode.exportClause) { // export * from './...'
-                const deeperAst = getFileAst(resolvePath(source, path.dirname(resolvedImportPath), aliases)!)
-                if (deeperAst) {
-                    const deeperSource = getOriginalSource(specifierName, deeperAst, resolvedImportPath, aliases);
-                    if (deeperSource) {
-                        originalSource = deeperSource;
-                        return;
+                const resolvedDeeperPath = resolvePath(source, path.dirname(filePath), aliases);
+                if (resolvedDeeperPath) {
+                    const deeperAst = getFileAst(resolvedDeeperPath);
+                    if (deeperAst) {
+                        const deeperSource = getOriginalSource(specifierName, deeperAst, resolvedDeeperPath, aliases);
+                        if (deeperSource) {
+                            originalSource = deeperSource;
+                            return;
+                        }
                     }
                 }
             }
-        } else if (ts.isExportAssignment(fileNode) && specifierName === 'default') { // export default ...
-            // This case is for `export default variable;` which is not a re-export from another file.
         }
     });
 
@@ -164,7 +159,6 @@ const noImportsFromReExports: TSESLint.RuleModule<MessageIds, [{ aliases?: Recor
                 } else if (specifier.type === AST_NODE_TYPES.ImportDefaultSpecifier) {
                     specifierName = 'default';
                 } else if (specifier.type === AST_NODE_TYPES.ImportNamespaceSpecifier) {
-                    // We don't handle namespace imports because we can't know which export is being used.
                     continue;
                 }
 
@@ -194,7 +188,7 @@ const noImportsFromReExports: TSESLint.RuleModule<MessageIds, [{ aliases?: Recor
                             },
                             fix(fixer) {
                                 if (originalSourceInfo.isNamespace) {
-                                    return fixer.replaceText(node, `import * as ${specifierName} from '${relativePath}'`);
+                                    return fixer.replaceText(node, `import * as ${specifierName} from '${relativePath}';`);
                                 }
                                 return fixer.replaceText(node.source, `'${relativePath}'`);
                             }
