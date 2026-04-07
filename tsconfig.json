@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
     "strict": true,
     "outDir": "dist",
     "sourceMap": true,
@@ -21,6 +20,6 @@
     "module": "commonjs",
     "target": "es6",
     "exactOptionalPropertyTypes": true,
-    "noUncheckedIndexedAccess": true,
+    "noUncheckedIndexedAccess": true
   }
 }
