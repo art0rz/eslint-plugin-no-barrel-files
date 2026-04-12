@@ -75,6 +75,12 @@ ruleTester.run('prefer-source-imports', preferSourceImports, {
       errors: [{ messageId: 'preferSourceImports' }],
     },
     {
+      code: `import type { TypeFoo } from './barrel-specifier-type';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import type { TypeFoo } from './types';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
       code: `import { Foo, type TypeFoo } from './barrel';`,
       filename: path.join(fixtureDirectory, 'consumer.ts'),
       output: `import { Foo } from './foo';\nimport type { TypeFoo } from './types';`,
@@ -105,6 +111,30 @@ ruleTester.run('prefer-source-imports', preferSourceImports, {
       code: `import { Foo, StarFoo } from './barrel';`,
       filename: path.join(fixtureDirectory, 'consumer.ts'),
       output: `import { Foo } from './foo';\nimport { StarFoo } from './star';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import type { TypeFoo } from './barrel-type-star';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import type { TypeFoo } from './types';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { Foo } from './barrel-same-name-value-first';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import { Foo } from './same-name-value';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import type { Foo } from './barrel-same-name-type-first';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import type { Foo } from './same-name-type';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import type { Existing } from './mixed';\nimport { Foo } from './mixed-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import { type Existing, Foo } from './mixed';\n`,
       errors: [{ messageId: 'preferSourceImports' }],
     },
     {
