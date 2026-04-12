@@ -1,8 +1,10 @@
 import { TSESLint } from '@typescript-eslint/utils';
 import noBarrelFiles from './rules/no-barrel-files';
+import preferSourceImports from './rules/prefer-source-imports';
 
 const rules = {
   'no-barrel-files': noBarrelFiles,
+  'prefer-source-imports': preferSourceImports,
 } satisfies Record<string, TSESLint.RuleModule<string, Array<unknown>>>;
 
 const pluginMeta = {
