@@ -67,5 +67,32 @@ ruleTester.run('no-barrel-files', noBarrelFiles, {
       `,
       errors: [{ messageId: 'noReExport' }],
     },
+    {
+      code: `
+      import { Foo } from './Moo';
+      export { Foo };
+      `,
+      errors: [{ messageId: 'noReExport' }],
+    },
+    {
+      code: `
+      import * as Foo from './Moo';
+      export { Foo };
+      `,
+      errors: [{ messageId: 'noReExport' }],
+    },
+    {
+      code: `
+      import { Foo as Bar } from './Moo';
+      export { Bar as Baz };
+      `,
+      errors: [{ messageId: 'noReExport' }],
+    },
+    {
+      code: `
+      export { default } from './Moo';
+      `,
+      errors: [{ messageId: 'noReExport' }],
+    },
   ],
 });

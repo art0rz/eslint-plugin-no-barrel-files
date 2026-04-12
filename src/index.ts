@@ -5,18 +5,45 @@ const rules = {
   'no-barrel-files': noBarrelFiles,
 } satisfies Record<string, TSESLint.RuleModule<string, Array<unknown>>>;
 
-const plugin = {
-  rules,
-  flat: {
-    plugins: {
-      'no-barrel-files': {
-        rules,
-      },
-    },
+const pluginMeta = {
+  name: 'eslint-plugin-no-barrel-files',
+  version: '1.2.2',
+} satisfies NonNullable<TSESLint.FlatConfig.Plugin['meta']>;
+
+const runtimeMeta = {
+  ...pluginMeta,
+  namespace: 'no-barrel-files',
+} as const;
+
+const recommendedConfig = {
+  plugins: {
+    'no-barrel-files': { meta: runtimeMeta, rules } as Omit<TSESLint.FlatConfig.Plugin, 'configs'>,
+  },
+  rules: {
+    'no-barrel-files/no-barrel-files': 'error',
+  },
+} satisfies TSESLint.FlatConfig.Config;
+
+const configs = {
+  recommended: [recommendedConfig],
+  'flat/recommended': [recommendedConfig],
+  'legacy-recommended': {
+    plugins: ['no-barrel-files'],
     rules: {
       'no-barrel-files/no-barrel-files': 'error',
     },
-  } satisfies TSESLint.FlatConfig.Config,
+  },
+} as const;
+
+const plugin = {
+  meta: runtimeMeta,
+  configs: configs as unknown as TSESLint.FlatConfig.Plugin['configs'],
+  rules,
+  flat: recommendedConfig,
+} as unknown as TSESLint.FlatConfig.Plugin & {
+  configs: typeof configs;
+  flat: TSESLint.FlatConfig.Config;
+  meta: typeof runtimeMeta;
 };
 
 export = plugin;

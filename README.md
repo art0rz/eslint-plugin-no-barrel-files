@@ -44,18 +44,20 @@ npm install eslint-plugin-no-barrel-files --save-dev
 ```
 
 ### ESLint config
-This plugin supports both flat config and legacy config.
+This plugin supports flat config in ESLint 9+ and legacy config in ESLint 8.
 
 #### Flat config (ESLint 9+)
 ```js
 import noBarrelFiles from "eslint-plugin-no-barrel-files";
 
 export default [
-  noBarrelFiles.flat,
+  ...noBarrelFiles.configs.recommended,
 ];
 ```
 
-#### Legacy config (ESLint <9)
+For backwards compatibility, `noBarrelFiles.flat` is still exported and is equivalent to the recommended flat config.
+
+#### Legacy config (ESLint 8)
 ```js
 module.exports = {
     plugins: ['no-barrel-files'],
@@ -65,6 +67,7 @@ module.exports = {
 }
 ```
 
+The plugin also exposes `configs['legacy-recommended']` for legacy config users on ESLint 8.
+
 ## Contributing
 If you need any additional features or you find a bug, feel free to submit a pull request or submit an issue.
-
