@@ -3,12 +3,22 @@ import path from 'node:path';
 import { AST_NODE_TYPES, TSESLint, TSESTree } from '@typescript-eslint/utils';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const parser = require('@typescript-eslint/parser');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const typescript = require('typescript');
 
 type MessageIds = 'preferSourceImport' | 'preferSourceImports';
+type Options = [
+  {
+    fixStyle?: 'auto' | 'preserve-alias' | 'relative';
+    paths?: Record<string, string | string[]>;
+    tsconfig?: boolean | string;
+  }?,
+];
 
 type ReExportTarget = {
   importedName: string;
-  sourcePath: string;
+  resolvedFilePath: string;
+  sourceSpecifier: string;
   isTypeOnly: boolean;
   fromExportAll: boolean;
 };
@@ -19,6 +29,7 @@ type NamedImportSpecifier = TSESTree.ImportSpecifier & {
 };
 
 type MatchedSpecifier = {
+  preferredSourceSpecifier: string;
   specifier: NamedImportSpecifier;
   reExportTarget: ReExportTarget;
 };
@@ -29,6 +40,16 @@ type BarrelAnalysis = {
 };
 
 const SOURCE_FILE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.mjs', '.cjs'] as const;
+
+type TsconfigInfo = {
+  compilerOptions: Record<string, unknown>;
+  configFilePath: string;
+};
+
+type ManualAliasMapping = {
+  pattern: string;
+  target: string;
+};
 
 function isRelativePath(value: string): boolean {
   return value.startsWith('.');
@@ -45,6 +66,43 @@ function resolveModuleFile(importerFilename: string, specifier: string): string 
   return (
     candidatePaths.find(candidatePath => fs.existsSync(candidatePath) && fs.statSync(candidatePath).isFile()) ?? null
   );
+}
+
+function normalizeModulePath(filePath: string): string {
+  const normalizedPath = filePath.split(path.sep).join('/');
+
+  return normalizedPath.replace(/\/index(?=(\.[^./]+)?$)/, '').replace(/\.[^./]+$/, '');
+}
+
+function toRelativeImportSpecifier(importerFilename: string, resolvedFilePath: string): string {
+  const relativePath = path.relative(path.dirname(importerFilename), resolvedFilePath);
+  const normalizedPath = normalizeModulePath(relativePath);
+
+  return normalizedPath.startsWith('.') ? normalizedPath : `./${normalizedPath}`;
+}
+
+function matchesAliasPattern(specifier: string, pattern: string): string | null {
+  if (!pattern.includes('*')) {
+    return specifier === pattern ? '' : null;
+  }
+
+  const [rawPrefix = '', rawSuffix = ''] = pattern.split('*');
+  const prefix = rawPrefix;
+  const suffix = rawSuffix;
+
+  if (!specifier.startsWith(prefix) || !specifier.endsWith(suffix)) {
+    return null;
+  }
+
+  return specifier.slice(prefix.length, specifier.length - suffix.length);
+}
+
+function applyAliasTarget(target: string, wildcardValue: string): string {
+  return target.includes('*') ? target.replace('*', wildcardValue) : target;
+}
+
+function buildAliasSpecifier(pattern: string, wildcardValue: string): string {
+  return pattern.includes('*') ? pattern.replace('*', wildcardValue) : pattern;
 }
 
 function parseModule(filePath: string): TSESTree.Program | null {
@@ -118,7 +176,10 @@ function parseExportedNames(filePath: string): Set<string> {
   return exportedNames;
 }
 
-function parseBarrelFile(barrelFilePath: string): BarrelAnalysis | null {
+function parseBarrelFile(
+  barrelFilePath: string,
+  resolveImport: (importerFilename: string, specifier: string) => string | null,
+): BarrelAnalysis | null {
   const program = parseModule(barrelFilePath);
 
   if (!program) {
@@ -134,9 +195,14 @@ function parseBarrelFile(barrelFilePath: string): BarrelAnalysis | null {
     if (
       statement.type === AST_NODE_TYPES.ExportNamedDeclaration &&
       source?.type === AST_NODE_TYPES.Literal &&
-      typeof source.value === 'string' &&
-      isRelativePath(source.value)
+      typeof source.value === 'string'
     ) {
+      const resolvedSourceFile = resolveImport(barrelFilePath, source.value);
+
+      if (!resolvedSourceFile) {
+        return;
+      }
+
       statement.specifiers.forEach(specifier => {
         if (
           specifier.type !== AST_NODE_TYPES.ExportSpecifier ||
@@ -148,7 +214,8 @@ function parseBarrelFile(barrelFilePath: string): BarrelAnalysis | null {
 
         explicitReExports.set(specifier.exported.name, {
           importedName: specifier.local.name,
-          sourcePath: source.value,
+          resolvedFilePath: resolvedSourceFile,
+          sourceSpecifier: source.value,
           isTypeOnly: statement.exportKind === 'type',
           fromExportAll: false,
         });
@@ -161,10 +228,9 @@ function parseBarrelFile(barrelFilePath: string): BarrelAnalysis | null {
       statement.exportKind !== 'type' &&
       statement.source !== null &&
       statement.source.type === AST_NODE_TYPES.Literal &&
-      typeof statement.source.value === 'string' &&
-      isRelativePath(statement.source.value)
+      typeof statement.source.value === 'string'
     ) {
-      const resolvedSourceFile = resolveModuleFile(barrelFilePath, statement.source.value);
+      const resolvedSourceFile = resolveImport(barrelFilePath, statement.source.value);
 
       if (!resolvedSourceFile) {
         return;
@@ -179,7 +245,8 @@ function parseBarrelFile(barrelFilePath: string): BarrelAnalysis | null {
 
         exportAllReExports.set(exportedName, {
           importedName: exportedName,
-          sourcePath: statement.source.value,
+          resolvedFilePath: resolvedSourceFile,
+          sourceSpecifier: statement.source.value,
           isTypeOnly: false,
           fromExportAll: true,
         });
@@ -235,9 +302,9 @@ function serializeImportBindings(
 
 function getMergeableImportDeclaration(
   node: TSESTree.ImportDeclaration,
-  sourcePath: string,
+  sourceSpecifier: string,
 ): TSESTree.ImportDeclaration | null {
-  if (node.source.value !== sourcePath) {
+  if (node.source.value !== sourceSpecifier) {
     return null;
   }
 
@@ -263,24 +330,24 @@ function buildAutofix(
 ): TSESLint.ReportFixFunction | null {
   const groupedImports = new Map<string, Array<{ importedName: string; isTypeOnly: boolean; localName: string }>>();
 
-  matchedSpecifiers.forEach(({ specifier, reExportTarget }) => {
-    const importBindings = groupedImports.get(reExportTarget.sourcePath) ?? [];
+  matchedSpecifiers.forEach(({ preferredSourceSpecifier, specifier, reExportTarget }) => {
+    const importBindings = groupedImports.get(preferredSourceSpecifier) ?? [];
     importBindings.push({
       importedName: reExportTarget.importedName,
       isTypeOnly: reExportTarget.isTypeOnly,
       localName: specifier.local.name,
     });
-    groupedImports.set(reExportTarget.sourcePath, importBindings);
+    groupedImports.set(preferredSourceSpecifier, importBindings);
   });
 
   const mergeTargets = new Map<string, TSESTree.ImportDeclaration>();
 
-  for (const sourcePath of groupedImports.keys()) {
+  for (const sourceSpecifier of groupedImports.keys()) {
     const matchingDeclarations = sourceCode.ast.body.filter(
       statement =>
         statement.type === AST_NODE_TYPES.ImportDeclaration &&
         statement !== currentNode &&
-        getMergeableImportDeclaration(statement, sourcePath),
+        getMergeableImportDeclaration(statement, sourceSpecifier),
     ) as TSESTree.ImportDeclaration[];
 
     if (matchingDeclarations.length > 1) {
@@ -288,15 +355,15 @@ function buildAutofix(
     }
 
     if (matchingDeclarations.length === 1) {
-      mergeTargets.set(sourcePath, matchingDeclarations[0]!);
+      mergeTargets.set(sourceSpecifier, matchingDeclarations[0]!);
     }
   }
 
   return fixer => {
     const fixes: TSESLint.RuleFix[] = [];
 
-    for (const [sourcePath, bindings] of groupedImports.entries()) {
-      const mergeTarget = mergeTargets.get(sourcePath);
+    for (const [sourceSpecifier, bindings] of groupedImports.entries()) {
+      const mergeTarget = mergeTargets.get(sourceSpecifier);
 
       if (!mergeTarget) {
         continue;
@@ -366,19 +433,19 @@ function buildAutofix(
         })),
         allTypeOnly,
       );
-      const mergedImport = `import${allTypeOnly ? ' type' : ''} { ${serializedBindings} } from ${quote}${sourcePath}${quote};`;
+      const mergedImport = `import${allTypeOnly ? ' type' : ''} { ${serializedBindings} } from ${quote}${sourceSpecifier}${quote};`;
 
       fixes.push(fixer.replaceText(mergeTarget, mergedImport));
-      groupedImports.delete(sourcePath);
+      groupedImports.delete(sourceSpecifier);
     }
 
     const quote = currentNode.source.raw?.startsWith("'") ? "'" : '"';
     const replacement = Array.from(groupedImports.entries())
-      .map(([sourcePath, bindings]) => {
+      .map(([sourceSpecifier, bindings]) => {
         const allTypeOnly = currentNode.importKind === 'type' || bindings.every(binding => binding.isTypeOnly);
         const serializedBindings = serializeImportBindings(bindings, allTypeOnly);
 
-        return `import${allTypeOnly ? ' type' : ''} { ${serializedBindings} } from ${quote}${sourcePath}${quote};`;
+        return `import${allTypeOnly ? ' type' : ''} { ${serializedBindings} } from ${quote}${sourceSpecifier}${quote};`;
       })
       .join('\n');
 
@@ -394,8 +461,8 @@ function buildAutofix(
   };
 }
 
-const preferSourceImports: TSESLint.RuleModule<MessageIds> = {
-  defaultOptions: [],
+const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
+  defaultOptions: [{}],
   meta: {
     type: 'suggestion',
     fixable: 'code',
@@ -403,19 +470,282 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds> = {
       url: 'https://github.com/art0rz/eslint-plugin-no-barrel-files',
       description: 'prefer importing from source modules instead of barrel re-exports',
     },
-    schema: [],
+    schema: [
+      {
+        type: 'object',
+        properties: {
+          fixStyle: {
+            type: 'string',
+            enum: ['auto', 'preserve-alias', 'relative'],
+          },
+          tsconfig: {
+            anyOf: [{ type: 'boolean' }, { type: 'string' }],
+          },
+          paths: {
+            type: 'object',
+            additionalProperties: {
+              anyOf: [
+                { type: 'string' },
+                {
+                  type: 'array',
+                  items: { type: 'string' },
+                },
+              ],
+            },
+          },
+        },
+        additionalProperties: false,
+      },
+    ],
     messages: {
       preferSourceImport: "Import '{{name}}' directly from '{{source}}' instead of barrel '{{barrel}}'.",
       preferSourceImports: "Import directly from source modules instead of barrel '{{barrel}}'.",
     },
   },
   create(context) {
+    const [options] = context.options;
     const sourceCode = context.sourceCode;
     const barrelExportCache = new Map<string, BarrelAnalysis | null>();
+    const tsconfigCache = new Map<string, TsconfigInfo | null>();
+    const fixStyle = options?.fixStyle ?? 'auto';
+
+    function getTsconfigPath(importerFilename: string): string | null {
+      if (options?.tsconfig === false) {
+        return null;
+      }
+
+      if (typeof options?.tsconfig === 'string') {
+        return path.isAbsolute(options.tsconfig) ? options.tsconfig : path.resolve(process.cwd(), options.tsconfig);
+      }
+
+      return typescript.findConfigFile(path.dirname(importerFilename), typescript.sys.fileExists, 'tsconfig.json');
+    }
+
+    function getTsconfigInfo(importerFilename: string): TsconfigInfo | null {
+      const tsconfigPath = getTsconfigPath(importerFilename);
+
+      if (!tsconfigPath) {
+        return null;
+      }
+
+      if (!tsconfigCache.has(tsconfigPath)) {
+        const configFile = typescript.readConfigFile(tsconfigPath, typescript.sys.readFile);
+
+        if (configFile.error) {
+          tsconfigCache.set(tsconfigPath, null);
+        } else {
+          const parsedConfig = typescript.parseJsonConfigFileContent(
+            configFile.config,
+            typescript.sys,
+            path.dirname(tsconfigPath),
+            undefined,
+            tsconfigPath,
+          );
+
+          tsconfigCache.set(tsconfigPath, {
+            compilerOptions: parsedConfig.options,
+            configFilePath: tsconfigPath,
+          });
+        }
+      }
+
+      return tsconfigCache.get(tsconfigPath) ?? null;
+    }
+
+    function resolveWithManualPaths(importerFilename: string, specifier: string): string | null {
+      const configuredPaths = options?.paths;
+
+      if (!configuredPaths) {
+        return null;
+      }
+
+      for (const [pattern, targetValue] of Object.entries(configuredPaths)) {
+        const wildcardValue = matchesAliasPattern(specifier, pattern);
+
+        if (wildcardValue === null) {
+          continue;
+        }
+
+        const targets = Array.isArray(targetValue) ? targetValue : [targetValue];
+
+        for (const target of targets) {
+          const candidateSpecifier = applyAliasTarget(target, wildcardValue);
+          const candidateBasePath = path.resolve(process.cwd(), candidateSpecifier);
+          const resolvedFilePath =
+            resolveModuleFile(importerFilename, candidateSpecifier) ??
+            resolveModuleFile(importerFilename, candidateBasePath);
+
+          if (resolvedFilePath) {
+            return resolvedFilePath;
+          }
+        }
+      }
+
+      return null;
+    }
+
+    function getManualAliasMappings(): Array<ManualAliasMapping> {
+      const configuredPaths = options?.paths;
+
+      if (!configuredPaths) {
+        return [];
+      }
+
+      return Object.entries(configuredPaths).flatMap(([pattern, targetValue]) =>
+        (Array.isArray(targetValue) ? targetValue : [targetValue]).map(target => ({
+          pattern,
+          target,
+        })),
+      );
+    }
+
+    function resolveWithTsconfig(importerFilename: string, specifier: string): string | null {
+      const tsconfigInfo = getTsconfigInfo(importerFilename);
+
+      if (!tsconfigInfo) {
+        return null;
+      }
+
+      const resolvedModule = typescript.resolveModuleName(
+        specifier,
+        importerFilename,
+        tsconfigInfo.compilerOptions,
+        typescript.sys,
+      ).resolvedModule;
+
+      if (!resolvedModule || resolvedModule.isExternalLibraryImport) {
+        return null;
+      }
+
+      return fs.existsSync(resolvedModule.resolvedFileName) ? resolvedModule.resolvedFileName : null;
+    }
+
+    function resolveImport(importerFilename: string, specifier: string): string | null {
+      if (isRelativePath(specifier)) {
+        return resolveModuleFile(importerFilename, specifier);
+      }
+
+      return resolveWithManualPaths(importerFilename, specifier) ?? resolveWithTsconfig(importerFilename, specifier);
+    }
+
+    function reverseResolveManualAlias(resolvedFilePath: string): string | null {
+      const candidateAliases = getManualAliasMappings()
+        .map(mapping => {
+          if (mapping.target.includes('*')) {
+            const [rawPrefix = '', rawSuffix = ''] = mapping.target.split('*');
+            const normalizedResolvedFilePath = normalizeModulePath(resolvedFilePath);
+            const normalizedPrefix = normalizeModulePath(path.resolve(process.cwd(), rawPrefix));
+            const normalizedSuffix = normalizeModulePath(rawSuffix);
+
+            if (
+              !normalizedResolvedFilePath.startsWith(normalizedPrefix) ||
+              !normalizedResolvedFilePath.endsWith(normalizedSuffix)
+            ) {
+              return null;
+            }
+
+            const wildcardValue = normalizedResolvedFilePath.slice(
+              normalizedPrefix.length,
+              normalizedResolvedFilePath.length - normalizedSuffix.length,
+            );
+
+            return buildAliasSpecifier(mapping.pattern, wildcardValue.replace(/^\//, ''));
+          }
+
+          const targetFilePath = resolveModuleFile(process.cwd(), path.resolve(process.cwd(), mapping.target));
+
+          return targetFilePath === resolvedFilePath ? mapping.pattern : null;
+        })
+        .filter((value): value is string => value !== null);
+
+      return candidateAliases.length === 1 ? (candidateAliases[0] ?? null) : null;
+    }
+
+    function reverseResolveTsconfigAlias(importerFilename: string, resolvedFilePath: string): string | null {
+      const tsconfigInfo = getTsconfigInfo(importerFilename);
+
+      if (!tsconfigInfo) {
+        return null;
+      }
+
+      const paths = tsconfigInfo.compilerOptions.paths;
+
+      if (!paths || typeof paths !== 'object') {
+        return null;
+      }
+
+      const candidateAliases = Object.entries(paths as Record<string, string[]>)
+        .flatMap(([pattern, targets]) =>
+          targets.map(target => {
+            if (target.includes('*')) {
+              const [rawPrefix = '', rawSuffix = ''] = target.split('*');
+              const normalizedResolvedFilePath = normalizeModulePath(resolvedFilePath);
+              const normalizedPrefix = normalizeModulePath(
+                path.resolve(path.dirname(tsconfigInfo.configFilePath), rawPrefix),
+              );
+              const normalizedSuffix = normalizeModulePath(rawSuffix);
+
+              if (
+                !normalizedResolvedFilePath.startsWith(normalizedPrefix) ||
+                !normalizedResolvedFilePath.endsWith(normalizedSuffix)
+              ) {
+                return null;
+              }
+
+              const wildcardValue = normalizedResolvedFilePath.slice(
+                normalizedPrefix.length,
+                normalizedResolvedFilePath.length - normalizedSuffix.length,
+              );
+
+              return buildAliasSpecifier(pattern, wildcardValue.replace(/^\//, ''));
+            }
+
+            const targetFilePath = resolveModuleFile(
+              importerFilename,
+              path.resolve(path.dirname(tsconfigInfo.configFilePath), target),
+            );
+
+            return targetFilePath === resolvedFilePath ? pattern : null;
+          }),
+        )
+        .filter((value): value is string => value !== null);
+
+      return candidateAliases.length === 1 ? (candidateAliases[0] ?? null) : null;
+    }
+
+    function getPreferredSourceSpecifier(
+      importerFilename: string,
+      originalImportSpecifier: string,
+      reExportTarget: ReExportTarget,
+    ): string | null {
+      if (fixStyle === 'relative') {
+        return toRelativeImportSpecifier(importerFilename, reExportTarget.resolvedFilePath);
+      }
+
+      if (!isRelativePath(reExportTarget.sourceSpecifier)) {
+        return reExportTarget.sourceSpecifier;
+      }
+
+      const aliasCandidates = [
+        reverseResolveManualAlias(reExportTarget.resolvedFilePath),
+        reverseResolveTsconfigAlias(importerFilename, reExportTarget.resolvedFilePath),
+      ].filter((value): value is string => value !== null);
+      const uniqueAliasCandidates = Array.from(new Set(aliasCandidates));
+
+      if (fixStyle === 'preserve-alias') {
+        return uniqueAliasCandidates.length === 1 ? (uniqueAliasCandidates[0] ?? null) : null;
+      }
+
+      if (!isRelativePath(originalImportSpecifier) && uniqueAliasCandidates.length === 1) {
+        return uniqueAliasCandidates[0] ?? null;
+      }
+
+      return toRelativeImportSpecifier(importerFilename, reExportTarget.resolvedFilePath);
+    }
 
     function getBarrelAnalysis(barrelFilePath: string): BarrelAnalysis | null {
       if (!barrelExportCache.has(barrelFilePath)) {
-        barrelExportCache.set(barrelFilePath, parseBarrelFile(barrelFilePath));
+        barrelExportCache.set(barrelFilePath, parseBarrelFile(barrelFilePath, resolveImport));
       }
 
       return barrelExportCache.get(barrelFilePath) ?? null;
@@ -423,17 +753,12 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds> = {
 
     return {
       ImportDeclaration(node) {
-        if (
-          !node.source.value ||
-          typeof node.source.value !== 'string' ||
-          !isRelativePath(node.source.value) ||
-          node.specifiers.length === 0
-        ) {
+        if (!node.source.value || typeof node.source.value !== 'string' || node.specifiers.length === 0) {
           return;
         }
 
         const importerFilename = context.filename;
-        const barrelFilePath = resolveModuleFile(importerFilename, node.source.value);
+        const barrelFilePath = resolveImport(importerFilename, node.source.value);
 
         if (!barrelFilePath) {
           return;
@@ -458,7 +783,18 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds> = {
           const explicitReExport = barrelAnalysis.explicitReExports.get(specifier.imported.name);
 
           if (explicitReExport && explicitReExport.isTypeOnly === specifierIsTypeOnly) {
+            const preferredSourceSpecifier = getPreferredSourceSpecifier(
+              importerFilename,
+              node.source.value,
+              explicitReExport,
+            );
+
+            if (!preferredSourceSpecifier) {
+              return;
+            }
+
             matchedSpecifiers.push({
+              preferredSourceSpecifier,
               specifier,
               reExportTarget: explicitReExport,
             });
@@ -475,7 +811,18 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds> = {
             return;
           }
 
+          const preferredSourceSpecifier = getPreferredSourceSpecifier(
+            importerFilename,
+            node.source.value,
+            exportAllReExport,
+          );
+
+          if (!preferredSourceSpecifier) {
+            return;
+          }
+
           matchedSpecifiers.push({
+            preferredSourceSpecifier,
             specifier,
             reExportTarget: exportAllReExport,
           });
@@ -486,7 +833,6 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds> = {
         }
 
         const canAutoFix =
-          matchedSpecifiers.every(({ reExportTarget }) => !reExportTarget.fromExportAll) &&
           matchedSpecifiers.length === node.specifiers.length &&
           node.specifiers.every(specifier => specifier.type === AST_NODE_TYPES.ImportSpecifier);
         const autofix = canAutoFix ? buildAutofix(sourceCode, node, matchedSpecifiers) : null;
@@ -511,7 +857,9 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds> = {
             data: {
               barrel: node.source.value,
               name: specifier.local.name,
-              source: reExportTarget.sourcePath,
+              source:
+                getPreferredSourceSpecifier(importerFilename, node.source.value, reExportTarget) ??
+                reExportTarget.sourceSpecifier,
             },
           });
         });

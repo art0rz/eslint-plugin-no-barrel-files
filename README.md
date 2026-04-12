@@ -52,7 +52,39 @@ import type { TypeFoo } from './types';
 ```
 
 This rule currently handles relative imports from explicit re-exports such as `export { Foo } from './foo'`, including aliased exports and `export { default as Foo } ...`.
-It also reports imports that come from direct `export * from './foo'` barrels, but does not autofix those cases.
+It also handles direct `export * from './foo'` barrels when the exported name can be resolved back to the source file.
+
+`prefer-source-imports` supports:
+- relative imports
+- TypeScript `baseUrl` and `paths` from the nearest `tsconfig.json`
+- explicit alias mappings through a `paths` rule option
+
+You can configure fix behavior with `fixStyle`:
+- `"relative"` always rewrites to relative source imports
+- `"preserve-alias"` preserves aliases only when the reverse alias mapping is unique
+- `"auto"` preserves aliases for alias-based imports when uniquely reversible, otherwise falls back to relative imports
+
+Example:
+```js
+export default [
+  {
+    plugins: {
+      "no-barrel-files": noBarrelFiles,
+    },
+    rules: {
+      "no-barrel-files/prefer-source-imports": [
+        "error",
+        {
+          fixStyle: "auto",
+          paths: {
+            "@app/*": "src/*",
+          },
+        },
+      ],
+    },
+  },
+];
+```
 
 ## Usage
 

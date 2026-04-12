@@ -98,21 +98,55 @@ ruleTester.run('prefer-source-imports', preferSourceImports, {
     {
       code: `import { StarFoo } from './barrel';`,
       filename: path.join(fixtureDirectory, 'consumer.ts'),
-      errors: [
-        {
-          messageId: 'preferSourceImport',
-          data: {
-            barrel: './barrel',
-            name: 'StarFoo',
-            source: './star',
-          },
-        },
-      ],
+      output: `import { StarFoo } from './star';`,
+      errors: [{ messageId: 'preferSourceImports' }],
     },
     {
       code: `import { Foo, StarFoo } from './barrel';`,
       filename: path.join(fixtureDirectory, 'consumer.ts'),
-      errors: [{ messageId: 'preferSourceImport' }, { messageId: 'preferSourceImport' }],
+      output: `import { Foo } from './foo';\nimport { StarFoo } from './star';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { Foo } from '@app/barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import { Foo } from '@app/foo';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { StarFoo } from '@app/barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import { StarFoo } from '@app/star';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { Foo } from '@manual/barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      options: [
+        {
+          tsconfig: false,
+          paths: {
+            '@manual/*': 'src/rules/tests/fixtures/prefer-source-imports/*',
+          },
+        },
+      ],
+      output: `import { Foo } from '@manual/foo';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { Foo } from '@manual/barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      options: [
+        {
+          fixStyle: 'relative',
+          tsconfig: false,
+          paths: {
+            '@manual/*': 'src/rules/tests/fixtures/prefer-source-imports/*',
+          },
+        },
+      ],
+      output: `import { Foo } from './foo';`,
+      errors: [{ messageId: 'preferSourceImports' }],
     },
   ],
 });
