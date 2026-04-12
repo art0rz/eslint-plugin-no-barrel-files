@@ -36,6 +36,24 @@ import { Moo } from './Moo';
 export const Baz = Moo;
 ```
 
+- `prefer-source-imports`
+```ts
+// fail
+import { Foo } from './barrel';
+import type { TypeFoo } from './barrel';
+
+// if barrel.ts contains:
+// export { Foo } from './foo';
+// export type { TypeFoo } from './types';
+
+// pass
+import { Foo } from './foo';
+import type { TypeFoo } from './types';
+```
+
+This rule currently handles relative imports from explicit re-exports such as `export { Foo } from './foo'`, including aliased exports and `export { default as Foo } ...`.
+It also reports imports that come from direct `export * from './foo'` barrels, but does not autofix those cases.
+
 ## Usage
 
 ### Install

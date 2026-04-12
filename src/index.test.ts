@@ -17,5 +17,7 @@ describe('plugin entrypoint', () => {
         'no-barrel-files/no-barrel-files': 'error',
       },
     });
+
+    expect(plugin.rules).toHaveProperty('prefer-source-imports');
   });
 });
