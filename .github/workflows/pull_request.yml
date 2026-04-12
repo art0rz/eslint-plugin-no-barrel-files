@@ -1,15 +1,24 @@
-name: test
+name: pull request
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
-  test:
+  checks:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        eslint-version: ['^8.0.0', '^9.0.0', '^10.0.0']
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
       - run: npm ci
+      - run: npm install --no-save eslint@${{ matrix.eslint-version }}
       - run: npm run lint
-      - run: npm run test
+      - run: npm test -- --run
       - run: npm run build
