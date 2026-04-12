@@ -229,6 +229,138 @@ describe('prefer-source-imports private helpers', () => {
     expect(Array.from(__private__.parseExportedBindings(brokenFile))).toEqual([]);
   });
 
+  it('recursively resolves export-all bindings and re-export targets with cycle protection', () => {
+    const tempDir = makeTempDir();
+    const resolve = (importerFilename: string, specifier: string) =>
+      __private__.resolveModuleFile(importerFilename, specifier);
+    const valueFile = path.join(tempDir, 'value.ts');
+    const explicitLeafFile = path.join(tempDir, 'explicit-leaf.ts');
+    const starLeafFile = path.join(tempDir, 'star-leaf.ts');
+
+    writeFiles(tempDir, {
+      'value.ts': 'export const Foo = 1;',
+      'types.ts': 'export type TypeFoo = { value: string };',
+      'explicit-leaf.ts': "export { Foo } from './value';\nexport type { TypeFoo } from './types';",
+      'explicit-barrel.ts': "export { Foo } from './explicit-leaf';\nexport type { TypeFoo } from './explicit-leaf';",
+      'star-leaf.ts': "export * from './value';\nexport type * from './types';",
+      'star-barrel.ts': "export * from './star-leaf';",
+      'cycle-a.ts': "export * from './cycle-b';",
+      'cycle-b.ts': "export * from './cycle-a';",
+    });
+
+    expect(Array.from(__private__.collectAllExportedBindings(starLeafFile, resolve)).sort()).toEqual([
+      'type:TypeFoo',
+      'value:Foo',
+    ]);
+    expect(Array.from(__private__.collectAllExportedBindings(starLeafFile, resolve, new Set([starLeafFile])))).toEqual(
+      [],
+    );
+
+    expect(__private__.resolveReExportTarget(explicitLeafFile, 'Foo', false, resolve)).toEqual({
+      importedName: 'Foo',
+      resolvedFilePath: valueFile,
+      sourceSpecifier: './value',
+      isTypeOnly: false,
+      fromExportAll: false,
+    });
+    expect(__private__.resolveReExportTarget(explicitLeafFile, 'TypeFoo', true, resolve)).toEqual({
+      importedName: 'TypeFoo',
+      resolvedFilePath: path.join(tempDir, 'types.ts'),
+      sourceSpecifier: './types',
+      isTypeOnly: true,
+      fromExportAll: false,
+    });
+    expect(__private__.resolveReExportTarget(starLeafFile, 'Foo', false, resolve)).toEqual({
+      importedName: 'Foo',
+      resolvedFilePath: valueFile,
+      sourceSpecifier: './value',
+      isTypeOnly: false,
+      fromExportAll: true,
+    });
+    expect(__private__.resolveReExportTarget(starLeafFile, 'Missing', false, resolve)).toBeNull();
+    expect(
+      __private__.resolveReExportTarget(
+        explicitLeafFile,
+        'Foo',
+        false,
+        resolve,
+        new Set([`${explicitLeafFile}:value:Foo`]),
+      ),
+    ).toBeNull();
+    expect(__private__.resolveReExportTarget(path.join(tempDir, 'cycle-a.ts'), 'Foo', false, resolve)).toBeNull();
+
+    const explicitAnalysis = __private__.parseBarrelFile(path.join(tempDir, 'explicit-barrel.ts'), resolve);
+    expect(explicitAnalysis?.explicitReExports.get('value:Foo')).toEqual({
+      importedName: 'Foo',
+      resolvedFilePath: valueFile,
+      sourceSpecifier: './value',
+      isTypeOnly: false,
+      fromExportAll: false,
+    });
+    expect(explicitAnalysis?.explicitReExports.get('type:TypeFoo')).toEqual({
+      importedName: 'TypeFoo',
+      resolvedFilePath: path.join(tempDir, 'types.ts'),
+      sourceSpecifier: './types',
+      isTypeOnly: true,
+      fromExportAll: false,
+    });
+
+    const starAnalysis = __private__.parseBarrelFile(path.join(tempDir, 'star-barrel.ts'), resolve);
+    expect(starAnalysis?.exportAllReExports.get('value:Foo')).toEqual({
+      importedName: 'Foo',
+      resolvedFilePath: valueFile,
+      sourceSpecifier: './value',
+      isTypeOnly: false,
+      fromExportAll: true,
+    });
+    expect(starAnalysis?.exportAllReExports.get('type:TypeFoo')).toEqual({
+      importedName: 'TypeFoo',
+      resolvedFilePath: path.join(tempDir, 'types.ts'),
+      sourceSpecifier: './types',
+      isTypeOnly: true,
+      fromExportAll: true,
+    });
+  });
+
+  it('covers recursive helper fallback branches and self-referential re-export skips', () => {
+    const tempDir = makeTempDir();
+    const resolve = (importerFilename: string, specifier: string) =>
+      __private__.resolveModuleFile(importerFilename, specifier);
+
+    writeFiles(tempDir, {
+      'duplicate-source.ts': 'export const Foo = 1;',
+      'duplicate-star.ts': "export const Foo = 1;\nexport * from './duplicate-source';",
+      'missing-export-all.ts': "export * from './missing-source';",
+      'type-star-value.ts': "export type * from './duplicate-source';",
+      'explicit-cycle-a.ts': "export * from './explicit-cycle-b';",
+      'explicit-cycle-b.ts': "export { Foo } from './explicit-cycle-a';",
+      'export-all-cycle-a.ts': "export * from './export-all-cycle-b';",
+      'export-all-cycle-b.ts': "export * from './export-all-cycle-c';",
+      'export-all-cycle-c.ts': "export { Foo } from './export-all-cycle-a';",
+    });
+
+    expect(Array.from(__private__.parseExportedBindings(path.join(tempDir, 'duplicate-source.ts')))).toEqual([
+      'value:Foo',
+    ]);
+    expect(Array.from(__private__.collectAllExportedBindings(path.join(tempDir, 'missing.ts'), resolve))).toEqual([]);
+    expect(
+      Array.from(__private__.collectAllExportedBindings(path.join(tempDir, 'duplicate-star.ts'), resolve)),
+    ).toEqual(['value:Foo']);
+    expect(
+      Array.from(__private__.collectAllExportedBindings(path.join(tempDir, 'missing-export-all.ts'), resolve)),
+    ).toEqual([]);
+    expect(
+      Array.from(__private__.collectAllExportedBindings(path.join(tempDir, 'type-star-value.ts'), resolve)),
+    ).toEqual([]);
+    expect(__private__.resolveReExportTarget(path.join(tempDir, 'missing.ts'), 'Foo', false, resolve)).toBeNull();
+    expect(
+      __private__.resolveReExportTarget(path.join(tempDir, 'explicit-cycle-b.ts'), 'Foo', false, resolve),
+    ).toBeNull();
+    expect(
+      __private__.resolveReExportTarget(path.join(tempDir, 'export-all-cycle-b.ts'), 'Foo', false, resolve),
+    ).toBeNull();
+  });
+
   it('collects barrel analysis and skips invalid or unresolved re-exports', () => {
     const tempDir = makeTempDir();
     const valueFile = path.join(tempDir, 'value.ts');

@@ -138,6 +138,24 @@ ruleTester.run('prefer-source-imports', preferSourceImports, {
       errors: [{ messageId: 'preferSourceImports' }],
     },
     {
+      code: `import { RecursiveFoo } from './recursive-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import { RecursiveFoo } from './recursive-foo';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { RecursiveStarFoo } from './recursive-star-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import { RecursiveStarFoo } from './recursive-star';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import type { RecursiveTypeFoo } from './recursive-type-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import type { RecursiveTypeFoo } from './recursive-types';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
       code: `import { Foo } from '@app/barrel';`,
       filename: path.join(fixtureDirectory, 'consumer.ts'),
       output: `import { Foo } from '@app/foo';`,
