@@ -148,5 +148,86 @@ ruleTester.run('prefer-source-imports', preferSourceImports, {
       output: `import { Foo } from './foo';`,
       errors: [{ messageId: 'preferSourceImports' }],
     },
+    {
+      code: `import { Existing } from '@app/foo';\nimport { Foo } from '@app/barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import { Existing, Foo } from '@app/foo';\n`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { type TypeFoo } from '@app/barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import type { TypeFoo } from '@app/types';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { Foo } from './barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      options: [
+        {
+          fixStyle: 'preserve-alias',
+          tsconfig: false,
+        },
+      ],
+      errors: [{ messageId: 'preferSourceImport' }],
+    },
+    {
+      code: `import { Foo } from '@app/barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      options: [
+        {
+          fixStyle: 'preserve-alias',
+        },
+      ],
+      output: `import { Foo } from '@app/foo';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { Foo } from '@app/barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      options: [
+        {
+          fixStyle: 'preserve-alias',
+          tsconfig: false,
+          paths: {
+            '@app/*': 'src/rules/tests/fixtures/prefer-source-imports/*',
+            '@dup-a/*': 'src/rules/tests/fixtures/prefer-source-imports/*',
+          },
+        },
+      ],
+      errors: [{ messageId: 'preferSourceImport' }],
+    },
+    {
+      code: `import { Foo } from '@app/barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      options: [
+        {
+          fixStyle: 'auto',
+          tsconfig: false,
+          paths: {
+            '@app/*': 'src/rules/tests/fixtures/prefer-source-imports/*',
+            '@dup-a/*': 'src/rules/tests/fixtures/prefer-source-imports/*',
+          },
+        },
+      ],
+      output: `import { Foo } from './foo';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { Foo } from '@manual/barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      options: [
+        {
+          fixStyle: 'preserve-alias',
+          tsconfig: false,
+          paths: {
+            '@dup-a/*': 'src/rules/tests/fixtures/prefer-source-imports/*',
+            '@dup-b/*': 'src/rules/tests/fixtures/prefer-source-imports/*',
+            '@manual/*': 'src/rules/tests/fixtures/prefer-source-imports/*',
+          },
+        },
+      ],
+      errors: [{ messageId: 'preferSourceImport' }],
+    },
   ],
 });
