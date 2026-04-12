@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/v1.2.2...v1.3.0) (2026-04-12)
+
+
+### Features
+
+* support ESLint 10 ([71dba90](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/71dba909c52504f2aa17497db5714624121486b2))
+
 ## [1.2.2](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/v1.2.1...v1.2.2) (2025-07-24)
 
 
