@@ -1,3 +1,10 @@
+## [1.3.1](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/v1.3.0...v1.3.1) (2026-04-12)
+
+
+### Bug Fixes
+
+* refresh lockfile for npm 11 ci ([e6efe55](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/e6efe55859c7584ab7608e2960641a1e9b34d8b8))
+
 # [1.3.0](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/v1.2.2...v1.3.0) (2026-04-12)
 
 
