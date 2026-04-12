@@ -29,7 +29,7 @@ type NamedImportSpecifier = TSESTree.ImportSpecifier & {
 };
 
 type MatchedSpecifier = {
-  preferredSourceSpecifier: string;
+  preferredSourceSpecifier: string | null;
   specifier: NamedImportSpecifier;
   reExportTarget: ReExportTarget;
 };
@@ -331,6 +331,10 @@ function buildAutofix(
   const groupedImports = new Map<string, Array<{ importedName: string; isTypeOnly: boolean; localName: string }>>();
 
   matchedSpecifiers.forEach(({ preferredSourceSpecifier, specifier, reExportTarget }) => {
+    if (!preferredSourceSpecifier) {
+      return;
+    }
+
     const importBindings = groupedImports.get(preferredSourceSpecifier) ?? [];
     importBindings.push({
       importedName: reExportTarget.importedName,
@@ -783,18 +787,12 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
           const explicitReExport = barrelAnalysis.explicitReExports.get(specifier.imported.name);
 
           if (explicitReExport && explicitReExport.isTypeOnly === specifierIsTypeOnly) {
-            const preferredSourceSpecifier = getPreferredSourceSpecifier(
-              importerFilename,
-              node.source.value,
-              explicitReExport,
-            );
-
-            if (!preferredSourceSpecifier) {
-              return;
-            }
-
             matchedSpecifiers.push({
-              preferredSourceSpecifier,
+              preferredSourceSpecifier: getPreferredSourceSpecifier(
+                importerFilename,
+                node.source.value,
+                explicitReExport,
+              ),
               specifier,
               reExportTarget: explicitReExport,
             });
@@ -811,18 +809,12 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
             return;
           }
 
-          const preferredSourceSpecifier = getPreferredSourceSpecifier(
-            importerFilename,
-            node.source.value,
-            exportAllReExport,
-          );
-
-          if (!preferredSourceSpecifier) {
-            return;
-          }
-
           matchedSpecifiers.push({
-            preferredSourceSpecifier,
+            preferredSourceSpecifier: getPreferredSourceSpecifier(
+              importerFilename,
+              node.source.value,
+              exportAllReExport,
+            ),
             specifier,
             reExportTarget: exportAllReExport,
           });
@@ -833,6 +825,7 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
         }
 
         const canAutoFix =
+          matchedSpecifiers.every(({ preferredSourceSpecifier }) => preferredSourceSpecifier !== null) &&
           matchedSpecifiers.length === node.specifiers.length &&
           node.specifiers.every(specifier => specifier.type === AST_NODE_TYPES.ImportSpecifier);
         const autofix = canAutoFix ? buildAutofix(sourceCode, node, matchedSpecifiers) : null;
