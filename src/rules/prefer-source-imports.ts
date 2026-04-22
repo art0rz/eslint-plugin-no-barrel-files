@@ -52,6 +52,20 @@ type ManualAliasMapping = {
   target: string;
 };
 
+const parsedModuleCache = new Map<string, TSESTree.Program | null>();
+const exportedBindingsCache = new Map<string, Set<string>>();
+const moduleFileResolutionCache = new Map<string, string | null>();
+const importResolutionCache = new Map<string, string | null>();
+const barrelAnalysisCache = new Map<string, BarrelAnalysis | null>();
+const tsconfigInfoCache = new Map<string, TsconfigInfo | null>();
+
+function getOptionsCacheKey(options: Options[0] | undefined, cwd: string): string {
+  return JSON.stringify({
+    cwd,
+    options: options ?? {},
+  });
+}
+
 function isRelativePath(value: string): boolean {
   return value.startsWith('.');
 }
@@ -75,6 +89,13 @@ function getReExportMeta(reExportKey: string): { exportedName: string; isTypeOnl
 }
 
 function resolveModuleFile(importerFilename: string, specifier: string): string | null {
+  const cacheKey = `${importerFilename}\0${specifier}`;
+  const cachedResult = moduleFileResolutionCache.get(cacheKey);
+
+  if (cachedResult !== undefined) {
+    return cachedResult;
+  }
+
   const resolvedBase = path.resolve(path.dirname(importerFilename), specifier);
   const candidatePaths = [
     resolvedBase,
@@ -82,9 +103,12 @@ function resolveModuleFile(importerFilename: string, specifier: string): string 
     ...SOURCE_FILE_EXTENSIONS.map(extension => path.join(resolvedBase, `index${extension}`)),
   ];
 
-  return (
-    candidatePaths.find(candidatePath => fs.existsSync(candidatePath) && fs.statSync(candidatePath).isFile()) ?? null
-  );
+  const resolvedFilePath =
+    candidatePaths.find(candidatePath => fs.existsSync(candidatePath) && fs.statSync(candidatePath).isFile()) ?? null;
+
+  moduleFileResolutionCache.set(cacheKey, resolvedFilePath);
+
+  return resolvedFilePath;
 }
 
 function normalizeModulePath(filePath: string): string {
@@ -125,16 +149,23 @@ function buildAliasSpecifier(pattern: string, wildcardValue: string): string {
 }
 
 function parseModule(filePath: string): TSESTree.Program | null {
+  const cachedProgram = parsedModuleCache.get(filePath);
+
+  if (cachedProgram !== undefined) {
+    return cachedProgram;
+  }
+
   let sourceText: string;
 
   try {
     sourceText = fs.readFileSync(filePath, 'utf8');
   } catch {
+    parsedModuleCache.set(filePath, null);
     return null;
   }
 
   try {
-    return parser.parse(sourceText, {
+    const program = parser.parse(sourceText, {
       filePath,
       ecmaVersion: 'latest',
       sourceType: 'module',
@@ -143,7 +174,12 @@ function parseModule(filePath: string): TSESTree.Program | null {
       comment: false,
       tokens: false,
     }) as TSESTree.Program;
+
+    parsedModuleCache.set(filePath, program);
+
+    return program;
   } catch {
+    parsedModuleCache.set(filePath, null);
     return null;
   }
 }
@@ -206,13 +242,25 @@ function collectExportedBindings(program: TSESTree.Program): Set<string> {
 }
 
 function parseExportedBindings(filePath: string): Set<string> {
+  const cachedBindings = exportedBindingsCache.get(filePath);
+
+  if (cachedBindings) {
+    return cachedBindings;
+  }
+
   const program = parseModule(filePath);
 
   if (!program) {
-    return new Set();
+    const emptyBindings = new Set<string>();
+    exportedBindingsCache.set(filePath, emptyBindings);
+
+    return emptyBindings;
   }
 
-  return collectExportedBindings(program);
+  const exportedBindings = collectExportedBindings(program);
+  exportedBindingsCache.set(filePath, exportedBindings);
+
+  return exportedBindings;
 }
 
 function collectAllExportedBindings(
@@ -771,14 +819,21 @@ function resolveImport(
   specifier: string,
   cwd: string = process.cwd(),
 ): string | null {
-  if (isRelativePath(specifier)) {
-    return resolveModuleFile(importerFilename, specifier);
+  const cacheKey = `${getOptionsCacheKey(options, cwd)}\0${importerFilename}\0${specifier}`;
+  const cachedResult = importResolutionCache.get(cacheKey);
+
+  if (cachedResult !== undefined) {
+    return cachedResult;
   }
 
-  return (
-    resolveWithManualPaths(options, importerFilename, specifier, cwd) ??
-    resolveWithTsconfig(options, importerFilename, specifier, tsconfigCache, cwd)
-  );
+  const resolvedFilePath = isRelativePath(specifier)
+    ? resolveModuleFile(importerFilename, specifier)
+    : (resolveWithManualPaths(options, importerFilename, specifier, cwd) ??
+      resolveWithTsconfig(options, importerFilename, specifier, tsconfigCache, cwd));
+
+  importResolutionCache.set(cacheKey, resolvedFilePath);
+
+  return resolvedFilePath;
 }
 
 function reverseResolveManualAlias(
@@ -918,16 +973,25 @@ function getBarrelAnalysis(
   tsconfigCache: Map<string, TsconfigInfo | null>,
   cwd: string = process.cwd(),
 ): BarrelAnalysis | null {
-  if (!barrelExportCache.has(barrelFilePath)) {
-    barrelExportCache.set(
-      barrelFilePath,
-      parseBarrelFile(barrelFilePath, (importerFilename, specifier) =>
-        resolveImport(options, tsconfigCache, importerFilename, specifier, cwd),
-      ),
-    );
+  const cacheKey = `${getOptionsCacheKey(options, cwd)}\0${barrelFilePath}`;
+  const cachedAnalysis = barrelExportCache.get(cacheKey);
+
+  if (cachedAnalysis !== undefined) {
+    return cachedAnalysis;
   }
 
-  return barrelExportCache.get(barrelFilePath) ?? null;
+  let barrelAnalysis = barrelAnalysisCache.get(cacheKey);
+
+  if (!barrelAnalysisCache.has(cacheKey)) {
+    barrelAnalysis = parseBarrelFile(barrelFilePath, (importerFilename, specifier) =>
+      resolveImport(options, tsconfigCache, importerFilename, specifier, cwd),
+    );
+    barrelAnalysisCache.set(cacheKey, barrelAnalysis);
+  }
+
+  barrelExportCache.set(cacheKey, barrelAnalysis ?? null);
+
+  return barrelAnalysis ?? null;
 }
 
 const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
@@ -975,7 +1039,7 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
     const [options] = context.options;
     const sourceCode = context.sourceCode;
     const barrelExportCache = new Map<string, BarrelAnalysis | null>();
-    const tsconfigCache = new Map<string, TsconfigInfo | null>();
+    const tsconfigCache = tsconfigInfoCache;
     const cwd = process.cwd();
 
     return {
