@@ -221,7 +221,7 @@ This is a good migration setup.
 ```js
 import noBarrelFiles from 'eslint-plugin-no-barrel-files';
 
-export default [...noBarrelFiles.configs.recommended];
+export default [...noBarrelFiles.configs['flat/recommended']];
 ```
 
 ### Use Manual Alias Resolution Only
