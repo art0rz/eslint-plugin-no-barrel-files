@@ -20,10 +20,13 @@ const env = {
   npm_config_cache: npmCacheDir,
 };
 
-function run(command, args, cwd = repoRoot, allowedStatuses = [0]) {
+function run(command, args, cwd = repoRoot, allowedStatuses = [0], envOverrides = {}) {
   const result = spawnSync(command, args, {
     cwd,
-    env,
+    env: {
+      ...env,
+      ...envOverrides,
+    },
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -82,6 +85,10 @@ try {
       path.join(projectDir, '.eslintrc.cjs'),
       [
         'module.exports = {',
+        '  parserOptions: {',
+        "    ecmaVersion: 'latest',",
+        "    sourceType: 'module',",
+        '  },',
         "  plugins: ['no-barrel-files'],",
         '  rules: {',
         "    'no-barrel-files/no-barrel-files': 'error',",
@@ -97,17 +104,19 @@ try {
   const eslintBin = path.join(repoRoot, 'node_modules', '.bin', process.platform === 'win32' ? 'eslint.cmd' : 'eslint');
   const outputFile = path.join(projectDir, 'eslint-output.json');
   const args = ['index.js', '--format', 'json', '--output-file', outputFile];
+  const eslintEnv = consumerConfig === 'legacy' ? { ESLINT_USE_FLAT_CONFIG: 'false' } : {};
 
   if (consumerConfig === 'legacy') {
-    args.unshift('--no-eslintrc', '--config', '.eslintrc.cjs');
+    args.unshift('--config', '.eslintrc.cjs');
   }
 
-  run(eslintBin, args, projectDir, [0, 1]);
+  run(eslintBin, args, projectDir, [0, 1], eslintEnv);
   const [result] = JSON.parse(fs.readFileSync(outputFile, 'utf8'));
+  const ruleMessage = result?.messages.find(message => message.ruleId === 'no-barrel-files/no-barrel-files');
 
   assert.ok(result, 'eslint did not return a lint result');
   assert.equal(result.errorCount, 1, `expected one lint error, received ${result.errorCount}`);
-  assert.equal(result.messages[0]?.ruleId, 'no-barrel-files/no-barrel-files');
+  assert.ok(ruleMessage, 'expected packaged plugin to report no-barrel-files/no-barrel-files');
 } finally {
   fs.rmSync(tempRoot, { force: true, recursive: true });
 }
