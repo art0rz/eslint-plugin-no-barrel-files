@@ -14,6 +14,7 @@
     "lockfile:check": "git diff --exit-code -- package-lock.json",
     "pack:smoke": "npm run build && node ./scripts/smoke-pack.mjs",
     "consumer:smoke": "npm run build && node ./scripts/smoke-consumer.mjs",
+    "release:please:config": "node ./scripts/create-release-please-config.mjs",
     "version:canary": "node ./scripts/version-canary.mjs"
   },
   "files": [
