@@ -51,13 +51,14 @@ jobs:
       - name: Update release PR title
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           version="$(
-            gh api "repos/${{ github.repository }}/contents/package.json?ref=${{ github.event.pull_request.head.ref }}" \
+            gh api "repos/${{ github.repository }}/contents/package.json?ref=${RELEASE_PR_HEAD_REF}" \
               --jq '.content' | base64 --decode | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version"
           )"
           package_name="$(
-            gh api "repos/${{ github.repository }}/contents/package.json?ref=${{ github.event.pull_request.head.ref }}" \
+            gh api "repos/${{ github.repository }}/contents/package.json?ref=${RELEASE_PR_HEAD_REF}" \
               --jq '.content' | base64 --decode | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).name"
           )"
           gh pr edit "${{ github.event.pull_request.number }}" --title "chore(main): release ${package_name} ${version}"
