@@ -156,6 +156,18 @@ ruleTester.run('prefer-source-imports', preferSourceImports, {
       errors: [{ messageId: 'preferSourceImports' }],
     },
     {
+      code: `import type { ClassThing } from './class-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import type { ClassThing } from './class-thing';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { DestructuredStar } from './destructured-star-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import { DestructuredStar } from './destructured-star';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
       code: `import { Foo } from '@app/barrel';`,
       filename: path.join(fixtureDirectory, 'consumer.ts'),
       output: `import { Foo } from '@app/foo';`,
