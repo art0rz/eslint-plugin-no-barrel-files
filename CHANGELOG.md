@@ -12,6 +12,28 @@
 
 * support ESLint 10 ([71dba90](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/71dba909c52504f2aa17497db5714624121486b2))
 
+## [1.5.0](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/eslint-plugin-no-barrel-files-v1.4.0...eslint-plugin-no-barrel-files-v1.5.0) (2026-04-26)
+
+
+### Features
+
+* add alias-aware source import fixes ([b2819c1](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/b2819c1e15c981fff4f540f11782f61bf1ae35e4))
+* add dual-rule recommended config ([5f07cc1](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/5f07cc19e61ca41a7d5e5734802d7ae56f99b676))
+* add prefer-source-imports rule ([867b772](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/867b7729a6a2477db075e7353545dec346f3ca19))
+
+
+### Bug Fixes
+
+* cover prefer-source-imports re-export edge cases ([8996d4a](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/8996d4a0498255acce53554879d3ea14732ab9ec))
+* harden prefer-source-imports runtime and caches ([adbd1f5](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/adbd1f52c35a7e39748fbac90c144b9cae52555e))
+* make prefer-source-imports typescript optional ([46862b9](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/46862b98567d1ab361d55389d3d91cb7b88bed9e))
+* tighten optional typescript handling ([a9eb6e6](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/a9eb6e6e4364ded6091cfbee58f73c28eb758f16))
+
+
+### Performance Improvements
+
+* cache prefer-source-imports analysis ([b362aba](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/b362aba7af00704d179100b31b842ac5d7e1ae50))
+
 ## [1.4.0](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/eslint-plugin-no-barrel-files-v1.3.1...eslint-plugin-no-barrel-files-v1.4.0) (2026-04-26)
 
 
