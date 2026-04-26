@@ -34,9 +34,20 @@ export type BarrelAnalysis = {
   exportAllReExports: Map<string, ReExportTarget>;
 };
 
+export type AnalysisCaches = {
+  exportedBindings: Map<string, Set<string>>;
+  parsedModules: Map<string, TSESTree.Program | null>;
+};
+
 export type TsconfigInfo = {
   compilerOptions: Record<string, unknown>;
   configFilePath: string;
+};
+
+export type ResolutionCaches = {
+  barrelAnalyses: Map<string, BarrelAnalysis | null>;
+  importResolutions: Map<string, string | null>;
+  tsconfigInfo: Map<string, TsconfigInfo | null>;
 };
 
 export type ManualAliasMapping = {

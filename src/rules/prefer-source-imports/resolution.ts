@@ -1,5 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+  AnalysisCaches,
+  BarrelAnalysis,
+  ManualAliasMapping,
+  Options,
+  ReExportTarget,
+  ResolutionCaches,
+  TsconfigInfo,
+} from './types';
 import { parseBarrelFile } from './analysis';
 import {
   applyAliasTarget,
@@ -11,14 +20,21 @@ import {
   resolveModuleFile,
   toRelativeImportSpecifier,
 } from './path-utils';
-import { BarrelAnalysis, ManualAliasMapping, Options, ReExportTarget, TsconfigInfo } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const typescript = require('typescript');
 
-const importResolutionCache = new Map<string, string | null>();
-const barrelAnalysisCache = new Map<string, BarrelAnalysis | null>();
 const tsconfigInfoCache = new Map<string, TsconfigInfo | null>();
+
+export function createResolutionCaches(
+  sharedTsconfigCache: Map<string, TsconfigInfo | null> = tsconfigInfoCache,
+): ResolutionCaches {
+  return {
+    barrelAnalyses: new Map<string, BarrelAnalysis | null>(),
+    importResolutions: new Map<string, string | null>(),
+    tsconfigInfo: sharedTsconfigCache,
+  };
+}
 
 export function getSharedTsconfigCache(): Map<string, TsconfigInfo | null> {
   return tsconfigInfoCache;
@@ -157,13 +173,13 @@ export function resolveWithTsconfig(
 
 export function resolveImport(
   options: Options[0] | undefined,
-  tsconfigCache: Map<string, TsconfigInfo | null>,
+  resolutionCaches: ResolutionCaches,
   importerFilename: string,
   specifier: string,
   cwd: string = process.cwd(),
 ): string | null {
   const cacheKey = `${getOptionsCacheKey(options, cwd)}\0${importerFilename}\0${specifier}`;
-  const cachedResult = importResolutionCache.get(cacheKey);
+  const cachedResult = resolutionCaches.importResolutions.get(cacheKey);
 
   if (cachedResult !== undefined) {
     return cachedResult;
@@ -172,9 +188,9 @@ export function resolveImport(
   const resolvedFilePath = isRelativePath(specifier)
     ? resolveModuleFile(importerFilename, specifier)
     : (resolveWithManualPaths(options, importerFilename, specifier, cwd) ??
-      resolveWithTsconfig(options, importerFilename, specifier, tsconfigCache, cwd));
+      resolveWithTsconfig(options, importerFilename, specifier, resolutionCaches.tsconfigInfo, cwd));
 
-  importResolutionCache.set(cacheKey, resolvedFilePath);
+  resolutionCaches.importResolutions.set(cacheKey, resolvedFilePath);
 
   return resolvedFilePath;
 }
@@ -313,7 +329,8 @@ export function getBarrelAnalysis(
   options: Options[0] | undefined,
   barrelFilePath: string,
   barrelExportCache: Map<string, BarrelAnalysis | null>,
-  tsconfigCache: Map<string, TsconfigInfo | null>,
+  resolutionCaches: ResolutionCaches,
+  analysisCaches: AnalysisCaches,
   cwd: string = process.cwd(),
 ): BarrelAnalysis | null {
   const cacheKey = `${getOptionsCacheKey(options, cwd)}\0${barrelFilePath}`;
@@ -323,13 +340,15 @@ export function getBarrelAnalysis(
     return cachedAnalysis;
   }
 
-  let barrelAnalysis = barrelAnalysisCache.get(cacheKey);
+  let barrelAnalysis = resolutionCaches.barrelAnalyses.get(cacheKey);
 
-  if (!barrelAnalysisCache.has(cacheKey)) {
-    barrelAnalysis = parseBarrelFile(barrelFilePath, (importerFilename, specifier) =>
-      resolveImport(options, tsconfigCache, importerFilename, specifier, cwd),
+  if (!resolutionCaches.barrelAnalyses.has(cacheKey)) {
+    barrelAnalysis = parseBarrelFile(
+      barrelFilePath,
+      (importerFilename, specifier) => resolveImport(options, resolutionCaches, importerFilename, specifier, cwd),
+      analysisCaches,
     );
-    barrelAnalysisCache.set(cacheKey, barrelAnalysis);
+    resolutionCaches.barrelAnalyses.set(cacheKey, barrelAnalysis);
   }
 
   barrelExportCache.set(cacheKey, barrelAnalysis ?? null);

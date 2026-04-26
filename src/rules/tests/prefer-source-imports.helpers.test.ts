@@ -317,6 +317,7 @@ describe('prefer-source-imports private helpers', () => {
     const tempDir = makeTempDir();
     const resolve = (importerFilename: string, specifier: string) =>
       __private__.resolveModuleFile(importerFilename, specifier);
+    const analysisCaches = __private__.createAnalysisCaches();
     const valueFile = path.join(tempDir, 'value.ts');
     const explicitLeafFile = path.join(tempDir, 'explicit-leaf.ts');
     const starLeafFile = path.join(tempDir, 'star-leaf.ts');
@@ -332,13 +333,20 @@ describe('prefer-source-imports private helpers', () => {
       'cycle-b.ts': "export * from './cycle-a';",
     });
 
-    expect(Array.from(__private__.collectAllExportedBindings(starLeafFile, resolve)).sort()).toEqual([
+    expect(Array.from(__private__.collectAllExportedBindings(starLeafFile, resolve, analysisCaches)).sort()).toEqual([
       'type:TypeFoo',
       'value:Foo',
     ]);
-    expect(Array.from(__private__.collectAllExportedBindings(starLeafFile, resolve, new Set([starLeafFile])))).toEqual(
-      [],
-    );
+    expect(
+      Array.from(
+        __private__.collectAllExportedBindings(
+          starLeafFile,
+          resolve,
+          __private__.createAnalysisCaches(),
+          new Set([starLeafFile]),
+        ),
+      ),
+    ).toEqual([]);
 
     expect(__private__.resolveReExportTarget(explicitLeafFile, 'Foo', false, resolve)).toEqual({
       importedName: 'Foo',
@@ -368,6 +376,7 @@ describe('prefer-source-imports private helpers', () => {
         'Foo',
         false,
         resolve,
+        __private__.createAnalysisCaches(),
         new Set([`${explicitLeafFile}:value:Foo`]),
       ),
     ).toBeNull();
@@ -410,6 +419,7 @@ describe('prefer-source-imports private helpers', () => {
     const tempDir = makeTempDir();
     const resolve = (importerFilename: string, specifier: string) =>
       __private__.resolveModuleFile(importerFilename, specifier);
+    const analysisCaches = __private__.createAnalysisCaches();
 
     writeFiles(tempDir, {
       'duplicate-source.ts': 'export const Foo = 1;',
@@ -426,15 +436,23 @@ describe('prefer-source-imports private helpers', () => {
     expect(Array.from(__private__.parseExportedBindings(path.join(tempDir, 'duplicate-source.ts')))).toEqual([
       'value:Foo',
     ]);
-    expect(Array.from(__private__.collectAllExportedBindings(path.join(tempDir, 'missing.ts'), resolve))).toEqual([]);
     expect(
-      Array.from(__private__.collectAllExportedBindings(path.join(tempDir, 'duplicate-star.ts'), resolve)),
-    ).toEqual(['value:Foo']);
-    expect(
-      Array.from(__private__.collectAllExportedBindings(path.join(tempDir, 'missing-export-all.ts'), resolve)),
+      Array.from(__private__.collectAllExportedBindings(path.join(tempDir, 'missing.ts'), resolve, analysisCaches)),
     ).toEqual([]);
     expect(
-      Array.from(__private__.collectAllExportedBindings(path.join(tempDir, 'type-star-value.ts'), resolve)),
+      Array.from(
+        __private__.collectAllExportedBindings(path.join(tempDir, 'duplicate-star.ts'), resolve, analysisCaches),
+      ),
+    ).toEqual(['value:Foo']);
+    expect(
+      Array.from(
+        __private__.collectAllExportedBindings(path.join(tempDir, 'missing-export-all.ts'), resolve, analysisCaches),
+      ),
+    ).toEqual([]);
+    expect(
+      Array.from(
+        __private__.collectAllExportedBindings(path.join(tempDir, 'type-star-value.ts'), resolve, analysisCaches),
+      ),
     ).toEqual([]);
     expect(__private__.resolveReExportTarget(path.join(tempDir, 'missing.ts'), 'Foo', false, resolve)).toBeNull();
     expect(
@@ -615,6 +633,7 @@ describe('prefer-source-imports private helpers', () => {
 
     const importer = path.join(tempDir, 'consumer.ts');
     const tsconfigCache = new Map<string, any>();
+    const resolutionCaches = __private__.createResolutionCaches(tsconfigCache);
     const options = {
       paths: {
         '@manual/*': ['missing/*', 'src/*'],
@@ -658,13 +677,13 @@ describe('prefer-source-imports private helpers', () => {
     );
     expect(__private__.resolveWithTsconfig({ tsconfig: false }, importer, '@app/foo', new Map(), tempDir)).toBeNull();
 
-    expect(__private__.resolveImport({}, tsconfigCache, importer, './src/foo', tempDir)).toBe(
+    expect(__private__.resolveImport({}, resolutionCaches, importer, './src/foo', tempDir)).toBe(
       path.join(tempDir, 'src/foo.ts'),
     );
-    expect(__private__.resolveImport(options, tsconfigCache, importer, '@manual/foo', tempDir)).toBe(
+    expect(__private__.resolveImport(options, resolutionCaches, importer, '@manual/foo', tempDir)).toBe(
       path.join(tempDir, 'src/foo.ts'),
     );
-    expect(__private__.resolveImport({}, tsconfigCache, importer, '@app/foo', tempDir)).toBe(
+    expect(__private__.resolveImport({}, resolutionCaches, importer, '@app/foo', tempDir)).toBe(
       path.join(tempDir, 'src/foo.ts'),
     );
 
@@ -877,9 +896,73 @@ describe('prefer-source-imports private helpers', () => {
 
     const barrelExportCache = new Map<string, any>();
     const barrelFilePath = path.join(tempDir, 'src/barrel.ts');
-    const first = __private__.getBarrelAnalysis({}, barrelFilePath, barrelExportCache, new Map(), tempDir);
-    const second = __private__.getBarrelAnalysis({}, barrelFilePath, barrelExportCache, new Map(), tempDir);
+    const resolutionCaches = __private__.createResolutionCaches(new Map());
+    const analysisCaches = __private__.createAnalysisCaches();
+    const first = __private__.getBarrelAnalysis(
+      {},
+      barrelFilePath,
+      barrelExportCache,
+      resolutionCaches,
+      analysisCaches,
+      tempDir,
+    );
+    const second = __private__.getBarrelAnalysis(
+      {},
+      barrelFilePath,
+      barrelExportCache,
+      resolutionCaches,
+      analysisCaches,
+      tempDir,
+    );
     expect(first).toBe(second);
+
+    const anotherBarrelExportCache = new Map<string, any>();
+    const reusedFromResolutionCache = __private__.getBarrelAnalysis(
+      {},
+      barrelFilePath,
+      anotherBarrelExportCache,
+      resolutionCaches,
+      __private__.createAnalysisCaches(),
+      tempDir,
+    );
+    expect(reusedFromResolutionCache).toBe(first);
+  });
+
+  it('uses fresh analysis caches to observe rewritten barrel files across lint runs', () => {
+    const tempDir = makeTempDir();
+    const resolve = (importerFilename: string, specifier: string) =>
+      __private__.resolveModuleFile(importerFilename, specifier);
+    const barrelFilePath = path.join(tempDir, 'barrel.ts');
+
+    writeFiles(tempDir, {
+      'value-a.ts': 'export const Foo = 1;',
+      'value-b.ts': 'export const Bar = 1;',
+      'barrel.ts': "export { Foo } from './value-a';",
+    });
+
+    const initialCaches = __private__.createAnalysisCaches();
+    expect(
+      __private__.parseBarrelFile(barrelFilePath, resolve, initialCaches)?.explicitReExports.get('value:Foo')
+        ?.resolvedFilePath,
+    ).toBe(path.join(tempDir, 'value-a.ts'));
+
+    fs.writeFileSync(barrelFilePath, "export { Bar } from './value-b';");
+
+    expect(
+      __private__.parseBarrelFile(barrelFilePath, resolve, initialCaches)?.explicitReExports.has('value:Foo'),
+    ).toBe(true);
+    expect(
+      __private__.parseBarrelFile(barrelFilePath, resolve, initialCaches)?.explicitReExports.has('value:Bar'),
+    ).toBe(false);
+
+    const freshCaches = __private__.createAnalysisCaches();
+    expect(
+      __private__.parseBarrelFile(barrelFilePath, resolve, freshCaches)?.explicitReExports.get('value:Bar')
+        ?.resolvedFilePath,
+    ).toBe(path.join(tempDir, 'value-b.ts'));
+    expect(__private__.parseBarrelFile(barrelFilePath, resolve, freshCaches)?.explicitReExports.has('value:Foo')).toBe(
+      false,
+    );
   });
 
   it('covers import serialization helpers and mergeable import detection', () => {
