@@ -4,13 +4,61 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: pr-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  checks:
+  actionlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: rhysd/actionlint@v1
+
+  compatibility:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
+        node-version: [20, 22, 24]
         eslint-version: ['^8.0.0', '^9.0.0', '^10.0.0']
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+      - run: npm ci
+      - run: npm install --no-save eslint@${{ matrix.eslint-version }}
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test -- --run
+      - run: npm run build
+      - run: npm run lockfile:check
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run test:coverage
+
+  consumer-smoke:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - eslint-version: '^8.0.0'
+            consumer-config: legacy
+          - eslint-version: '^9.0.0'
+            consumer-config: flat
+          - eslint-version: '^10.0.0'
+            consumer-config: flat
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -19,6 +67,31 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm install --no-save eslint@${{ matrix.eslint-version }}
-      - run: npm run lint
-      - run: npm test -- --run
+      - name: Smoke test packed consumer install
+        env:
+          CONSUMER_CONFIG: ${{ matrix.consumer-config }}
+        run: npm run consumer:smoke
+
+  package-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
       - run: npm run build
+      - run: npm run pack:smoke
+
+  audit:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm audit --audit-level=high
