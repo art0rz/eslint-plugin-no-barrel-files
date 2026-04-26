@@ -29,7 +29,7 @@ References:
 npm install --save-dev eslint-plugin-no-barrel-files
 ```
 
-If you plan to use `prefer-source-imports`, also install `typescript` in the consuming project. The rule uses your project's TypeScript resolver so it can follow `tsconfig.json`, `baseUrl`, and `paths` consistently with the codebase being linted.
+If you plan to use `prefer-source-imports` with TypeScript files or tsconfig-based path resolution, also install `typescript` in the consuming project. The rule uses your project's TypeScript resolver so it can follow `tsconfig.json`, `baseUrl`, and `paths` consistently with the codebase being linted.
 
 ```sh
 npm install --save-dev typescript
@@ -301,6 +301,7 @@ Typical rollout options:
 
 - `prefer-source-imports` depends on being able to resolve the barrel and the underlying source module.
 - `prefer-source-imports` uses the consuming project's `typescript` installation for tsconfig parsing and module resolution.
+- If `prefer-source-imports` runs on a TypeScript file without `typescript` installed and tsconfig resolution is enabled, the rule reports a configuration error instead of crashing the plugin.
 - Alias preservation only happens when reverse alias lookup is unique.
 - If multiple aliases point to the same file, the fixer may fall back to a relative path or skip autofix depending on `fixStyle`.
 - The plugin does not currently ship a recommended config that enables both rules by default.
