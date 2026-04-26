@@ -4,11 +4,17 @@
   "description": "",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "clean": "node -e \"const fs = require('node:fs'); fs.rmSync('dist', { recursive: true, force: true }); fs.rmSync('tsconfig.build.tsbuildinfo', { force: true });\"",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit",
     "watch": "tsc -p tsconfig.build.json --watch",
     "test": "vitest",
     "test:coverage": "vitest --run --coverage",
     "lint": "eslint .",
+    "lockfile:check": "git diff --exit-code -- package-lock.json",
+    "pack:smoke": "npm run build && node ./scripts/smoke-pack.mjs",
+    "consumer:smoke": "npm run build && node ./scripts/smoke-consumer.mjs",
+    "release:dry-run": "semantic-release --dry-run",
     "semantic-release": "semantic-release"
   },
   "files": [
