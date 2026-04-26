@@ -1,0 +1,101 @@
+name: release please override
+
+on:
+  workflow_dispatch:
+    inputs:
+      major_bump:
+        description: Force the next release PR to the next major version
+        required: true
+        default: true
+        type: boolean
+      close_existing_pr:
+        description: Close the current open release PR before creating the override PR
+        required: true
+        default: true
+        type: boolean
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: release-please-override-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  release-please-override:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Determine release override
+        run: |
+          release_as=''
+          if [ "${{ inputs.major_bump }}" = "true" ]; then
+            current_version="$(node -p "require('./.release-please-manifest.json')['.']")"
+            release_as="$(node -p "const [major] = '${current_version}'.split('.'); String(Number(major) + 1) + '.0.0'")"
+          fi
+          echo "release_as=${release_as}" >> "$GITHUB_OUTPUT"
+        id: override
+      - name: Close existing release PR
+        if: ${{ inputs.close_existing_pr }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pr_number="$(
+            gh pr list \
+              --base main \
+              --state open \
+              --json number,headRefName \
+              --jq '.[] | select(.headRefName | startswith("release-please--branches--")) | .number' \
+              | head -n 1
+          )"
+
+          if [ -n "${pr_number}" ]; then
+            gh pr close "${pr_number}" --comment "Closed automatically before recreating this release PR as version ${{ steps.override.outputs.release_as }}."
+          fi
+      - uses: googleapis/release-please-action@v4
+        with:
+          config-file: .github/release-please-config.json
+          manifest-file: .release-please-manifest.json
+          target-branch: main
+          release-as: ${{ steps.override.outputs.release_as }}
+      - name: Sync release PR title
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pr_number="$(
+            gh pr list \
+              --base main \
+              --state open \
+              --json number,headRefName \
+              --jq '.[] | select(.headRefName | startswith("release-please--branches--")) | .number' \
+              | head -n 1
+          )"
+          pr_head_ref="$(
+            gh pr list \
+              --base main \
+              --state open \
+              --json number,headRefName \
+              --jq '.[] | select(.headRefName | startswith("release-please--branches--")) | .headRefName' \
+              | head -n 1
+          )"
+
+          if [ -z "${pr_number}" ] || [ -z "${pr_head_ref}" ]; then
+            echo "No open release PR found after running release-please override."
+            exit 1
+          fi
+
+          version="$(
+            gh api "repos/${{ github.repository }}/contents/package.json?ref=${pr_head_ref}" \
+              --jq '.content' | base64 --decode | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version"
+          )"
+          package_name="$(
+            gh api "repos/${{ github.repository }}/contents/package.json?ref=${pr_head_ref}" \
+              --jq '.content' | base64 --decode | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).name"
+          )"
+
+          gh pr edit "${pr_number}" --title "chore(main): release ${package_name} ${version}"
