@@ -71,7 +71,7 @@ try {
         "import plugin from 'eslint-plugin-no-barrel-files';",
         '',
         'export default [',
-        '  ...plugin.configs.recommended,',
+        "  ...plugin.configs['flat/recommended'],",
         '];',
         '',
       ].join('\n'),
