@@ -6,6 +6,9 @@ on:
       - main
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 concurrency:
   group: release-please-${{ github.ref }}
   cancel-in-progress: true
@@ -19,7 +22,23 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v6
+      - name: Determine release override
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          labels="$(gh pr list --base main --state open --json headRefName,labels --jq '[.[] | select(.headRefName | startswith("release-please--branches--")) | .labels[].name] | unique | join(",")')"
+          override=''
+          if printf '%s' ",${labels}," | grep -q ',release:major,'; then
+            override='release:major'
+          fi
+          echo "release_override=${override}" >> "$GITHUB_OUTPUT"
+        id: override
+      - name: Generate release-please config
+        env:
+          RELEASE_PLEASE_OVERRIDE: ${{ steps.override.outputs.release_override }}
+        run: node ./scripts/create-release-please-config.mjs
       - uses: googleapis/release-please-action@v4
         with:
-          config-file: .github/release-please-config.json
+          config-file: .github/release-please-config.generated.json
           manifest-file: .release-please-manifest.json

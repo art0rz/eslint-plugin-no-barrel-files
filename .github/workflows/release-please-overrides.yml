@@ -1,0 +1,63 @@
+name: release please overrides
+
+on:
+  pull_request_target:
+    types:
+      - labeled
+      - unlabeled
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: release-please-overrides-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  release-please:
+    if: >-
+      startsWith(github.event.pull_request.head.ref, 'release-please--branches--') &&
+      (github.event.label.name == 'release:major' || contains(join(github.event.pull_request.labels.*.name, ','), 'release:major'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+      - name: Determine release override
+        env:
+          RELEASE_PLEASE_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          override=''
+          if printf '%s' ",${RELEASE_PLEASE_LABELS}," | grep -q ',release:major,'; then
+            override='release:major'
+          fi
+          echo "release_override=${override}" >> "$GITHUB_OUTPUT"
+        id: override
+      - name: Generate release-please config
+        env:
+          RELEASE_PLEASE_OVERRIDE: ${{ steps.override.outputs.release_override }}
+        run: node ./scripts/create-release-please-config.mjs
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: .github/release-please-config.generated.json
+          manifest-file: .release-please-manifest.json
+          target-branch: ${{ github.event.pull_request.base.ref }}
+      - name: Update release PR title
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="$(
+            gh api "repos/${{ github.repository }}/contents/package.json?ref=${{ github.event.pull_request.head.ref }}" \
+              --jq '.content' | base64 --decode | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version"
+          )"
+          package_name="$(
+            gh api "repos/${{ github.repository }}/contents/package.json?ref=${{ github.event.pull_request.head.ref }}" \
+              --jq '.content' | base64 --decode | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).name"
+          )"
+          gh pr edit "${{ github.event.pull_request.number }}" --title "chore(main): release ${package_name} ${version}"
