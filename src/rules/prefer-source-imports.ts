@@ -1,5 +1,6 @@
 import { AST_NODE_TYPES, TSESLint, TSESTree } from '@typescript-eslint/utils';
 import {
+  createAnalysisCaches,
   collectAllExportedBindings,
   collectBarrelAnalysis,
   collectExportedBindings,
@@ -27,6 +28,7 @@ import {
   toRelativeImportSpecifier,
 } from './prefer-source-imports/path-utils';
 import {
+  createResolutionCaches,
   getBarrelAnalysis,
   getManualAliasMappings,
   getPreferredSourceSpecifier,
@@ -100,7 +102,8 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
     const [options] = context.options;
     const sourceCode = context.sourceCode;
     const barrelExportCache = new Map<string, BarrelAnalysis | null>();
-    const tsconfigCache = getSharedTsconfigCache();
+    const analysisCaches = createAnalysisCaches();
+    const resolutionCaches = createResolutionCaches(getSharedTsconfigCache());
     const cwd = process.cwd();
 
     return {
@@ -110,13 +113,20 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
         }
 
         const importerFilename = context.filename;
-        const barrelFilePath = resolveImport(options, tsconfigCache, importerFilename, node.source.value, cwd);
+        const barrelFilePath = resolveImport(options, resolutionCaches, importerFilename, node.source.value, cwd);
 
         if (!barrelFilePath) {
           return;
         }
 
-        const barrelAnalysis = getBarrelAnalysis(options, barrelFilePath, barrelExportCache, tsconfigCache, cwd);
+        const barrelAnalysis = getBarrelAnalysis(
+          options,
+          barrelFilePath,
+          barrelExportCache,
+          resolutionCaches,
+          analysisCaches,
+          cwd,
+        );
 
         if (!barrelAnalysis) {
           return;
@@ -142,7 +152,7 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
                 importerFilename,
                 node.source.value,
                 explicitReExport,
-                tsconfigCache,
+                resolutionCaches.tsconfigInfo,
                 cwd,
               ),
               specifier,
@@ -163,7 +173,7 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
               importerFilename,
               node.source.value,
               exportAllReExport,
-              tsconfigCache,
+              resolutionCaches.tsconfigInfo,
               cwd,
             ),
             specifier,
@@ -207,7 +217,7 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
                   importerFilename,
                   node.source.value,
                   reExportTarget,
-                  tsconfigCache,
+                  resolutionCaches.tsconfigInfo,
                   cwd,
                 ) ?? reExportTarget.sourceSpecifier,
             },
@@ -225,6 +235,8 @@ export const __private__ = {
   collectAllExportedBindings,
   collectBarrelAnalysis,
   collectExportedBindings,
+  createAnalysisCaches,
+  createResolutionCaches,
   getBarrelAnalysis,
   getManualAliasMappings,
   getMergeableImportDeclaration,

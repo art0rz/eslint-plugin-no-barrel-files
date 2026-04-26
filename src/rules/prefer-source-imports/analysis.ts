@@ -1,12 +1,16 @@
 import fs from 'node:fs';
 import { AST_NODE_TYPES, TSESTree } from '@typescript-eslint/utils';
-import { BarrelAnalysis, ReExportTarget } from './types';
+import { AnalysisCaches, BarrelAnalysis, ReExportTarget } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const parser = require('@typescript-eslint/parser');
 
-const parsedModuleCache = new Map<string, TSESTree.Program | null>();
-const exportedBindingsCache = new Map<string, Set<string>>();
+export function createAnalysisCaches(): AnalysisCaches {
+  return {
+    exportedBindings: new Map<string, Set<string>>(),
+    parsedModules: new Map<string, TSESTree.Program | null>(),
+  };
+}
 
 export function getReExportKey(exportedName: string, isTypeOnly: boolean): string {
   return `${isTypeOnly ? 'type' : 'value'}:${exportedName}`;
@@ -26,8 +30,11 @@ export function getReExportMeta(reExportKey: string): { exportedName: string; is
   };
 }
 
-export function parseModule(filePath: string): TSESTree.Program | null {
-  const cachedProgram = parsedModuleCache.get(filePath);
+export function parseModule(
+  filePath: string,
+  analysisCaches: AnalysisCaches = createAnalysisCaches(),
+): TSESTree.Program | null {
+  const cachedProgram = analysisCaches.parsedModules.get(filePath);
 
   if (cachedProgram !== undefined) {
     return cachedProgram;
@@ -38,7 +45,7 @@ export function parseModule(filePath: string): TSESTree.Program | null {
   try {
     sourceText = fs.readFileSync(filePath, 'utf8');
   } catch {
-    parsedModuleCache.set(filePath, null);
+    analysisCaches.parsedModules.set(filePath, null);
     return null;
   }
 
@@ -53,11 +60,11 @@ export function parseModule(filePath: string): TSESTree.Program | null {
       tokens: false,
     }) as TSESTree.Program;
 
-    parsedModuleCache.set(filePath, program);
+    analysisCaches.parsedModules.set(filePath, program);
 
     return program;
   } catch {
-    parsedModuleCache.set(filePath, null);
+    analysisCaches.parsedModules.set(filePath, null);
     return null;
   }
 }
@@ -206,24 +213,27 @@ export function collectExportedBindings(program: TSESTree.Program): Set<string> 
   return exportedBindings;
 }
 
-export function parseExportedBindings(filePath: string): Set<string> {
-  const cachedBindings = exportedBindingsCache.get(filePath);
+export function parseExportedBindings(
+  filePath: string,
+  analysisCaches: AnalysisCaches = createAnalysisCaches(),
+): Set<string> {
+  const cachedBindings = analysisCaches.exportedBindings.get(filePath);
 
   if (cachedBindings) {
     return cachedBindings;
   }
 
-  const program = parseModule(filePath);
+  const program = parseModule(filePath, analysisCaches);
 
   if (!program) {
     const emptyBindings = new Set<string>();
-    exportedBindingsCache.set(filePath, emptyBindings);
+    analysisCaches.exportedBindings.set(filePath, emptyBindings);
 
     return emptyBindings;
   }
 
   const exportedBindings = collectExportedBindings(program);
-  exportedBindingsCache.set(filePath, exportedBindings);
+  analysisCaches.exportedBindings.set(filePath, exportedBindings);
 
   return exportedBindings;
 }
@@ -231,13 +241,14 @@ export function parseExportedBindings(filePath: string): Set<string> {
 export function collectAllExportedBindings(
   filePath: string,
   resolveImport: (importerFilename: string, specifier: string) => string | null,
+  analysisCaches: AnalysisCaches = createAnalysisCaches(),
   visitedFiles: Set<string> = new Set(),
 ): Set<string> {
   if (visitedFiles.has(filePath)) {
     return new Set();
   }
 
-  const program = parseModule(filePath);
+  const program = parseModule(filePath, analysisCaches);
 
   if (!program) {
     return new Set();
@@ -264,7 +275,12 @@ export function collectAllExportedBindings(
       return;
     }
 
-    const nestedBindings = collectAllExportedBindings(resolvedSourceFile, resolveImport, nextVisitedFiles);
+    const nestedBindings = collectAllExportedBindings(
+      resolvedSourceFile,
+      resolveImport,
+      analysisCaches,
+      nextVisitedFiles,
+    );
 
     nestedBindings.forEach(reExportKey => {
       const { isTypeOnly } = getReExportMeta(reExportKey);
@@ -289,6 +305,7 @@ export function resolveReExportTarget(
   exportedName: string,
   isTypeOnly: boolean,
   resolveImport: (importerFilename: string, specifier: string) => string | null,
+  analysisCaches: AnalysisCaches = createAnalysisCaches(),
   visitedTargets: Set<string> = new Set(),
 ): ReExportTarget | null {
   const reExportKey = getReExportKey(exportedName, isTypeOnly);
@@ -298,7 +315,7 @@ export function resolveReExportTarget(
     return null;
   }
 
-  const program = parseModule(filePath);
+  const program = parseModule(filePath, analysisCaches);
 
   if (!program) {
     return null;
@@ -307,7 +324,7 @@ export function resolveReExportTarget(
   const nextVisitedTargets = new Set(visitedTargets);
   nextVisitedTargets.add(visitedTargetKey);
 
-  const barrelAnalysis = collectBarrelAnalysis(program, filePath, resolveImport, nextVisitedTargets);
+  const barrelAnalysis = collectBarrelAnalysis(program, filePath, resolveImport, analysisCaches, nextVisitedTargets);
 
   if (!barrelAnalysis) {
     return null;
@@ -322,6 +339,7 @@ export function collectBarrelAnalysis(
   program: TSESTree.Program,
   barrelFilePath: string,
   resolveImport: (importerFilename: string, specifier: string) => string | null,
+  analysisCaches: AnalysisCaches = createAnalysisCaches(),
   visitedTargets: Set<string> = new Set(),
 ): BarrelAnalysis | null {
   const explicitReExports = new Map<string, ReExportTarget>();
@@ -351,13 +369,14 @@ export function collectBarrelAnalysis(
         }
 
         const specifierIsTypeOnly = statement.exportKind === 'type' || specifier.exportKind === 'type';
-        const sourceExportedBindings = parseExportedBindings(resolvedSourceFile);
+        const sourceExportedBindings = parseExportedBindings(resolvedSourceFile, analysisCaches);
         const resolvedTarget =
           resolveReExportTarget(
             resolvedSourceFile,
             specifier.local.name,
             specifierIsTypeOnly,
             resolveImport,
+            analysisCaches,
             visitedTargets,
           ) ??
           ({
@@ -405,7 +424,12 @@ export function collectBarrelAnalysis(
         return;
       }
 
-      const exportedBindings = collectAllExportedBindings(resolvedSourceFile, resolveImport, new Set([barrelFilePath]));
+      const exportedBindings = collectAllExportedBindings(
+        resolvedSourceFile,
+        resolveImport,
+        analysisCaches,
+        new Set([barrelFilePath]),
+      );
 
       exportedBindings.forEach(reExportKey => {
         const { exportedName, isTypeOnly } = getReExportMeta(reExportKey);
@@ -419,7 +443,14 @@ export function collectBarrelAnalysis(
         }
 
         const resolvedTarget =
-          resolveReExportTarget(resolvedSourceFile, exportedName, isTypeOnly, resolveImport, visitedTargets) ??
+          resolveReExportTarget(
+            resolvedSourceFile,
+            exportedName,
+            isTypeOnly,
+            resolveImport,
+            analysisCaches,
+            visitedTargets,
+          ) ??
           ({
             importedName: exportedName,
             resolvedFilePath: resolvedSourceFile,
@@ -456,12 +487,13 @@ export function collectBarrelAnalysis(
 export function parseBarrelFile(
   barrelFilePath: string,
   resolveImport: (importerFilename: string, specifier: string) => string | null,
+  analysisCaches: AnalysisCaches = createAnalysisCaches(),
 ): BarrelAnalysis | null {
-  const program = parseModule(barrelFilePath);
+  const program = parseModule(barrelFilePath, analysisCaches);
 
   if (!program) {
     return null;
   }
 
-  return collectBarrelAnalysis(program, barrelFilePath, resolveImport);
+  return collectBarrelAnalysis(program, barrelFilePath, resolveImport, analysisCaches);
 }
