@@ -33,21 +33,22 @@ jobs:
           RELEASE_PLEASE_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
         run: |
           override=''
+          release_as=''
           if printf '%s' ",${RELEASE_PLEASE_LABELS}," | grep -q ',release:major,'; then
             override='release:major'
+            current_version="$(node -p "require('./.release-please-manifest.json')['.']")"
+            release_as="$(node -p "const [major] = '${current_version}'.split('.'); String(Number(major) + 1) + '.0.0'")"
           fi
           echo "release_override=${override}" >> "$GITHUB_OUTPUT"
+          echo "release_as=${release_as}" >> "$GITHUB_OUTPUT"
         id: override
-      - name: Generate release-please config
-        env:
-          RELEASE_PLEASE_OVERRIDE: ${{ steps.override.outputs.release_override }}
-        run: node ./scripts/create-release-please-config.mjs
       - uses: googleapis/release-please-action@v4
         id: release
         with:
-          config-file: .github/release-please-config.generated.json
+          config-file: .github/release-please-config.json
           manifest-file: .release-please-manifest.json
           target-branch: ${{ github.event.pull_request.base.ref }}
+          release-as: ${{ steps.override.outputs.release_as }}
       - name: Update release PR title
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
