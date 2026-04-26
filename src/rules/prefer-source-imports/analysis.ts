@@ -69,15 +69,102 @@ export function collectExportedBindings(program: TSESTree.Program): Set<string> 
     exportedBindings.add(getReExportKey(exportedName, isTypeOnly));
   }
 
+  function collectBindingNames(
+    name:
+      | TSESTree.ArrayPattern
+      | TSESTree.AssignmentPattern
+      | TSESTree.Identifier
+      | TSESTree.ObjectPattern
+      | TSESTree.RestElement,
+  ): string[] {
+    switch (name.type) {
+      case AST_NODE_TYPES.Identifier:
+        return [name.name];
+      case AST_NODE_TYPES.ObjectPattern:
+        return name.properties.flatMap(property => {
+          if (property.type === AST_NODE_TYPES.Property) {
+            if (
+              property.value.type === AST_NODE_TYPES.Identifier ||
+              property.value.type === AST_NODE_TYPES.ObjectPattern ||
+              property.value.type === AST_NODE_TYPES.ArrayPattern ||
+              property.value.type === AST_NODE_TYPES.AssignmentPattern
+            ) {
+              return collectBindingNames(property.value);
+            }
+
+            return [];
+          }
+
+          if (property.type === AST_NODE_TYPES.RestElement) {
+            if (
+              property.argument.type === AST_NODE_TYPES.Identifier ||
+              property.argument.type === AST_NODE_TYPES.ObjectPattern ||
+              property.argument.type === AST_NODE_TYPES.ArrayPattern ||
+              property.argument.type === AST_NODE_TYPES.AssignmentPattern
+            ) {
+              return collectBindingNames(property.argument);
+            }
+
+            return [];
+          }
+
+          return [];
+        });
+      case AST_NODE_TYPES.ArrayPattern:
+        return name.elements.flatMap(element => {
+          if (!element) {
+            return [];
+          }
+
+          if (element.type === AST_NODE_TYPES.RestElement) {
+            if (
+              element.argument.type === AST_NODE_TYPES.Identifier ||
+              element.argument.type === AST_NODE_TYPES.ObjectPattern ||
+              element.argument.type === AST_NODE_TYPES.ArrayPattern ||
+              element.argument.type === AST_NODE_TYPES.AssignmentPattern
+            ) {
+              return collectBindingNames(element.argument);
+            }
+
+            return [];
+          }
+
+          if (
+            element.type === AST_NODE_TYPES.Identifier ||
+            element.type === AST_NODE_TYPES.ObjectPattern ||
+            element.type === AST_NODE_TYPES.ArrayPattern ||
+            element.type === AST_NODE_TYPES.AssignmentPattern
+          ) {
+            return collectBindingNames(element);
+          }
+
+          return [];
+        });
+      case AST_NODE_TYPES.AssignmentPattern:
+        return collectBindingNames(name.left);
+      case AST_NODE_TYPES.RestElement:
+        if (
+          name.argument.type === AST_NODE_TYPES.Identifier ||
+          name.argument.type === AST_NODE_TYPES.ObjectPattern ||
+          name.argument.type === AST_NODE_TYPES.ArrayPattern ||
+          name.argument.type === AST_NODE_TYPES.AssignmentPattern
+        ) {
+          return collectBindingNames(name.argument);
+        }
+
+        return [];
+    }
+  }
+
   program.body.forEach(statement => {
     if (statement.type === AST_NODE_TYPES.ExportNamedDeclaration) {
       if (statement.declaration) {
         switch (statement.declaration.type) {
           case AST_NODE_TYPES.VariableDeclaration:
             statement.declaration.declarations.forEach(declaration => {
-              if (declaration.id.type === AST_NODE_TYPES.Identifier) {
-                addExportedBinding(declaration.id.name, false);
-              }
+              collectBindingNames(declaration.id).forEach(bindingName => {
+                addExportedBinding(bindingName, false);
+              });
             });
             break;
           case AST_NODE_TYPES.FunctionDeclaration:
@@ -264,6 +351,7 @@ export function collectBarrelAnalysis(
         }
 
         const specifierIsTypeOnly = statement.exportKind === 'type' || specifier.exportKind === 'type';
+        const sourceExportedBindings = parseExportedBindings(resolvedSourceFile);
         const resolvedTarget =
           resolveReExportTarget(
             resolvedSourceFile,
@@ -291,6 +379,16 @@ export function collectBarrelAnalysis(
           isTypeOnly: specifierIsTypeOnly,
           fromExportAll: false,
         });
+
+        if (!specifierIsTypeOnly && sourceExportedBindings.has(getReExportKey(specifier.local.name, true))) {
+          explicitReExports.set(getReExportKey(specifier.exported.name, true), {
+            importedName: resolvedTarget.importedName,
+            resolvedFilePath: resolvedTarget.resolvedFilePath,
+            sourceSpecifier: resolvedTarget.sourceSpecifier,
+            isTypeOnly: true,
+            fromExportAll: false,
+          });
+        }
       });
     }
 

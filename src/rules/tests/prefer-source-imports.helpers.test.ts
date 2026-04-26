@@ -107,7 +107,84 @@ describe('prefer-source-imports private helpers', () => {
             type: AST_NODE_TYPES.VariableDeclaration,
             declarations: [
               { id: { type: AST_NODE_TYPES.Identifier, name: 'ValueVar' } },
-              { id: { type: AST_NODE_TYPES.ArrayPattern } },
+              {
+                id: {
+                  type: AST_NODE_TYPES.ObjectPattern,
+                  properties: [
+                    {
+                      type: AST_NODE_TYPES.Property,
+                      value: { type: AST_NODE_TYPES.Identifier, name: 'ObjectValue' },
+                    },
+                    {
+                      type: AST_NODE_TYPES.Property,
+                      value: {
+                        type: AST_NODE_TYPES.AssignmentPattern,
+                        left: { type: AST_NODE_TYPES.Identifier, name: 'AssignedValue' },
+                      },
+                    },
+                    {
+                      type: AST_NODE_TYPES.Property,
+                      value: {
+                        type: AST_NODE_TYPES.Literal,
+                        value: 'skip-non-binding-object-value',
+                      },
+                    },
+                    {
+                      type: AST_NODE_TYPES.RestElement,
+                      argument: { type: AST_NODE_TYPES.Identifier, name: 'RestValue' },
+                    },
+                    {
+                      type: AST_NODE_TYPES.RestElement,
+                      argument: {
+                        type: AST_NODE_TYPES.MemberExpression,
+                      },
+                    },
+                    {
+                      type: 'ExperimentalObjectPatternProperty',
+                    },
+                  ],
+                },
+              },
+              {
+                id: {
+                  type: AST_NODE_TYPES.ArrayPattern,
+                  elements: [
+                    { type: AST_NODE_TYPES.Identifier, name: 'ArrayValue' },
+                    null,
+                    {
+                      type: AST_NODE_TYPES.AssignmentPattern,
+                      left: { type: AST_NODE_TYPES.Identifier, name: 'NestedValue' },
+                    },
+                    {
+                      type: AST_NODE_TYPES.RestElement,
+                      argument: { type: AST_NODE_TYPES.Identifier, name: 'ArrayRestValue' },
+                    },
+                    {
+                      type: AST_NODE_TYPES.RestElement,
+                      argument: {
+                        type: AST_NODE_TYPES.MemberExpression,
+                      },
+                    },
+                    {
+                      type: AST_NODE_TYPES.MemberExpression,
+                    },
+                  ],
+                },
+              },
+              {
+                id: {
+                  type: AST_NODE_TYPES.RestElement,
+                  argument: { type: AST_NODE_TYPES.Identifier, name: 'TopLevelRestValue' },
+                },
+              },
+              {
+                id: {
+                  type: AST_NODE_TYPES.RestElement,
+                  argument: {
+                    type: AST_NODE_TYPES.MemberExpression,
+                  },
+                },
+              },
             ],
           },
           specifiers: [],
@@ -214,9 +291,16 @@ describe('prefer-source-imports private helpers', () => {
       'type:NamedEnum',
       'type:NamedInterface',
       'type:TypeFromSpecifier',
+      'value:ArrayRestValue',
+      'value:ArrayValue',
+      'value:AssignedValue',
       'value:NamedClass',
       'value:NamedEnum',
       'value:NamedFn',
+      'value:NestedValue',
+      'value:ObjectValue',
+      'value:RestValue',
+      'value:TopLevelRestValue',
       'value:ValueFromSpecifier',
       'value:ValueVar',
     ]);
