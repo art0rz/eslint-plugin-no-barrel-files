@@ -5,7 +5,7 @@ describe('plugin entrypoint', () => {
   it('exposes ESLint 10-compatible metadata and config exports', () => {
     expect(plugin.meta).toEqual({
       name: 'eslint-plugin-no-barrel-files',
-      version: '1.2.2',
+      version: '1.4.0',
       namespace: 'no-barrel-files',
     });
 

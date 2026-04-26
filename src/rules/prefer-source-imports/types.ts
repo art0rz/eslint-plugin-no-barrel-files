@@ -1,6 +1,7 @@
 import { TSESTree } from '@typescript-eslint/utils';
+import type { CompilerOptions } from 'typescript';
 
-export type MessageIds = 'preferSourceImport' | 'preferSourceImports';
+export type MessageIds = 'missingTypeScript' | 'preferSourceImport' | 'preferSourceImports';
 
 export type Options = [
   {
@@ -40,7 +41,7 @@ export type AnalysisCaches = {
 };
 
 export type TsconfigInfo = {
-  compilerOptions: Record<string, unknown>;
+  compilerOptions: CompilerOptions;
   configFilePath: string;
 };
 

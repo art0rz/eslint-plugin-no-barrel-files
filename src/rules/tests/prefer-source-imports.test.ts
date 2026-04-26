@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { RuleTester } from '@typescript-eslint/rule-tester';
-import preferSourceImports from '../prefer-source-imports';
+import preferSourceImports, { __private__ } from '../prefer-source-imports';
 
 const ruleTester = new RuleTester();
 const fixtureDirectory = path.join(process.cwd(), 'src/rules/tests/fixtures/prefer-source-imports');
@@ -21,6 +21,34 @@ ruleTester.run('prefer-source-imports', preferSourceImports, {
     },
   ],
   invalid: [
+    {
+      code: `import { Foo } from './barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      errors: [{ messageId: 'missingTypeScript' }],
+      before: () => {
+        __private__.setTypeScriptModuleLoaderForTests(() => null);
+      },
+      after: () => {
+        __private__.setTypeScriptModuleLoaderForTests(null);
+      },
+    },
+    {
+      code: `import { Foo } from './barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      options: [
+        {
+          tsconfig: false,
+        },
+      ],
+      output: `import { Foo } from './foo';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+      before: () => {
+        __private__.setTypeScriptModuleLoaderForTests(() => null);
+      },
+      after: () => {
+        __private__.setTypeScriptModuleLoaderForTests(null);
+      },
+    },
     {
       code: `import { Foo } from './barrel';`,
       filename: path.join(fixtureDirectory, 'consumer.ts'),

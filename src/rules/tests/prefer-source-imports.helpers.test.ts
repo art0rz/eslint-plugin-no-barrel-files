@@ -50,6 +50,7 @@ function createFixer() {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  __private__.setTypeScriptModuleLoaderForTests(null);
   process.chdir(originalCwd);
 });
 
@@ -79,6 +80,34 @@ describe('prefer-source-imports private helpers', () => {
     expect(__private__.getReExportKey('Foo', true)).toBe('type:Foo');
     expect(__private__.getReExportMeta('type:Foo')).toEqual({ exportedName: 'Foo', isTypeOnly: true });
     expect(__private__.getReExportMeta('value:Foo')).toEqual({ exportedName: 'Foo', isTypeOnly: false });
+    expect(__private__.shouldReportMissingTypeScript('/repo/src/file.ts', {})).toBe(false);
+    expect(__private__.shouldReportMissingTypeScript('/repo/src/file.js', {})).toBe(false);
+  });
+
+  it('covers optional TypeScript dependency helpers', () => {
+    __private__.setTypeScriptModuleLoaderForTests(() => null);
+
+    expect(__private__.getTypeScriptModule()).toBeNull();
+    expect(__private__.hasTypeScriptModule()).toBe(false);
+    expect(__private__.shouldReportMissingTypeScript('/repo/src/file.ts', {})).toBe(true);
+    expect(__private__.shouldReportMissingTypeScript('/repo/src/file.ts', { tsconfig: false })).toBe(false);
+    expect(__private__.getTsconfigPath({}, '/repo/src/file.ts')).toBeNull();
+    expect(__private__.resolveWithTsconfig({}, '/repo/src/file.ts', '@app/foo', new Map())).toBeNull();
+
+    __private__.setTypeScriptModuleLoaderForTests(
+      () =>
+        ({
+          findConfigFile: () => undefined,
+          sys: {
+            fileExists: () => false,
+          },
+        }) as any,
+    );
+
+    expect(__private__.hasTypeScriptModule()).toBe(true);
+    expect(__private__.shouldReportMissingTypeScript('/repo/src/file.tsx', {})).toBe(false);
+    expect(__private__.getTsconfigPath({ tsconfig: false }, '/repo/src/file.ts')).toBeNull();
+    expect(__private__.getTsconfigPath({}, '/repo/src/file.ts')).toBeNull();
   });
 
   it('covers parseModule read and parse failures', () => {

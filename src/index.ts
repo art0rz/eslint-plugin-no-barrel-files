@@ -9,7 +9,7 @@ const rules = {
 
 const pluginMeta = {
   name: 'eslint-plugin-no-barrel-files',
-  version: '1.2.2',
+  version: '1.4.0',
 } satisfies NonNullable<TSESLint.FlatConfig.Plugin['meta']>;
 
 const runtimeMeta = {

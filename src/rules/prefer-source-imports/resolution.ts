@@ -20,14 +20,22 @@ import {
   resolveModuleFile,
   toRelativeImportSpecifier,
 } from './path-utils';
+import type typescriptModule from 'typescript';
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const typescript = require('typescript');
+type TypeScriptModule = typeof typescriptModule;
 
-const tsconfigInfoCache = new Map<string, TsconfigInfo | null>();
+let loadTypeScriptModule: () => TypeScriptModule | null = () => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require('typescript') as TypeScriptModule;
+  } catch {
+    /* c8 ignore next */
+    return null;
+  }
+};
 
 export function createResolutionCaches(
-  sharedTsconfigCache: Map<string, TsconfigInfo | null> = tsconfigInfoCache,
+  sharedTsconfigCache: Map<string, TsconfigInfo | null> = new Map<string, TsconfigInfo | null>(),
 ): ResolutionCaches {
   return {
     barrelAnalyses: new Map<string, BarrelAnalysis | null>(),
@@ -36,8 +44,26 @@ export function createResolutionCaches(
   };
 }
 
-export function getSharedTsconfigCache(): Map<string, TsconfigInfo | null> {
-  return tsconfigInfoCache;
+export function setTypeScriptModuleLoaderForTests(loader: (() => TypeScriptModule | null) | null): void {
+  loadTypeScriptModule =
+    loader ??
+    (() => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        return require('typescript') as TypeScriptModule;
+      } catch {
+        /* c8 ignore next */
+        return null;
+      }
+    });
+}
+
+export function getTypeScriptModule(): TypeScriptModule | null {
+  return loadTypeScriptModule();
+}
+
+export function hasTypeScriptModule(): boolean {
+  return getTypeScriptModule() !== null;
 }
 
 export function getTsconfigPath(
@@ -45,6 +71,12 @@ export function getTsconfigPath(
   importerFilename: string,
   cwd: string = process.cwd(),
 ): string | null {
+  const typescript = getTypeScriptModule();
+
+  if (!typescript) {
+    return null;
+  }
+
   if (options?.tsconfig === false) {
     return null;
   }
@@ -53,7 +85,7 @@ export function getTsconfigPath(
     return path.isAbsolute(options.tsconfig) ? options.tsconfig : path.resolve(cwd, options.tsconfig);
   }
 
-  return typescript.findConfigFile(path.dirname(importerFilename), typescript.sys.fileExists, 'tsconfig.json');
+  return typescript.findConfigFile(path.dirname(importerFilename), typescript.sys.fileExists, 'tsconfig.json') ?? null;
 }
 
 export function getTsconfigInfo(
@@ -62,6 +94,12 @@ export function getTsconfigInfo(
   tsconfigCache: Map<string, TsconfigInfo | null>,
   cwd: string = process.cwd(),
 ): TsconfigInfo | null {
+  const typescript = getTypeScriptModule();
+
+  if (!typescript) {
+    return null;
+  }
+
   const tsconfigPath = getTsconfigPath(options, importerFilename, cwd);
 
   if (!tsconfigPath) {
@@ -151,6 +189,12 @@ export function resolveWithTsconfig(
   tsconfigCache: Map<string, TsconfigInfo | null>,
   cwd: string = process.cwd(),
 ): string | null {
+  const typescript = getTypeScriptModule();
+
+  if (!typescript) {
+    return null;
+  }
+
   const tsconfigInfo = getTsconfigInfo(options, importerFilename, tsconfigCache, cwd);
 
   if (!tsconfigInfo) {

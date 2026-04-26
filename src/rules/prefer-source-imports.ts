@@ -32,7 +32,8 @@ import {
   getBarrelAnalysis,
   getManualAliasMappings,
   getPreferredSourceSpecifier,
-  getSharedTsconfigCache,
+  getTypeScriptModule,
+  hasTypeScriptModule,
   getTsconfigInfo,
   getTsconfigPath,
   resolveImport,
@@ -40,6 +41,7 @@ import {
   resolveWithTsconfig,
   reverseResolveManualAlias,
   reverseResolveTsconfigAlias,
+  setTypeScriptModuleLoaderForTests,
 } from './prefer-source-imports/resolution';
 import {
   BarrelAnalysis,
@@ -49,12 +51,18 @@ import {
   Options,
 } from './prefer-source-imports/types';
 
+const typescriptFilePattern = /\.(?:cts|mts|ts|tsx)$/i;
+
 function isNamedImportSpecifier(specifier: TSESTree.ImportClause): specifier is NamedImportSpecifier {
   return (
     specifier.type === AST_NODE_TYPES.ImportSpecifier &&
     specifier.imported.type === AST_NODE_TYPES.Identifier &&
     specifier.local.type === AST_NODE_TYPES.Identifier
   );
+}
+
+function shouldReportMissingTypeScript(filename: string, options: Options[0] | undefined): boolean {
+  return options?.tsconfig !== false && typescriptFilePattern.test(filename) && !hasTypeScriptModule();
 }
 
 const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
@@ -94,6 +102,8 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
       },
     ],
     messages: {
+      missingTypeScript:
+        "prefer-source-imports requires the 'typescript' package to lint TypeScript files when tsconfig resolution is enabled. Install 'typescript' in the consuming project or set 'tsconfig: false'.",
       preferSourceImport: "Import '{{name}}' directly from '{{source}}' instead of barrel '{{barrel}}'.",
       preferSourceImports: "Import directly from source modules instead of barrel '{{barrel}}'.",
     },
@@ -103,11 +113,26 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
     const sourceCode = context.sourceCode;
     const barrelExportCache = new Map<string, BarrelAnalysis | null>();
     const analysisCaches = createAnalysisCaches();
-    const resolutionCaches = createResolutionCaches(getSharedTsconfigCache());
+    const resolutionCaches = createResolutionCaches();
     const cwd = process.cwd();
+    const missingTypeScript = shouldReportMissingTypeScript(context.filename, options);
 
     return {
+      Program(node) {
+        if (!missingTypeScript) {
+          return;
+        }
+
+        context.report({
+          node,
+          messageId: 'missingTypeScript',
+        });
+      },
       ImportDeclaration(node) {
+        if (missingTypeScript) {
+          return;
+        }
+
         if (!node.source.value || typeof node.source.value !== 'string' || node.specifiers.length === 0) {
           return;
         }
@@ -239,6 +264,8 @@ export const __private__ = {
   createResolutionCaches,
   getBarrelAnalysis,
   getManualAliasMappings,
+  getTypeScriptModule,
+  hasTypeScriptModule,
   getMergeableImportDeclaration,
   getPreferredSourceSpecifier,
   getReExportKey,
@@ -260,6 +287,8 @@ export const __private__ = {
   resolveWithTsconfig,
   reverseResolveManualAlias,
   reverseResolveTsconfigAlias,
+  setTypeScriptModuleLoaderForTests,
+  shouldReportMissingTypeScript,
   serializeImportBinding,
   serializeImportBindings,
   toRelativeImportSpecifier,
