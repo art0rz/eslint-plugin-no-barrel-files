@@ -51,8 +51,6 @@ import {
   Options,
 } from './prefer-source-imports/types';
 
-const typescriptFilePattern = /\.(?:cts|mts|ts|tsx)$/i;
-
 function isNamedImportSpecifier(specifier: TSESTree.ImportClause): specifier is NamedImportSpecifier {
   return (
     specifier.type === AST_NODE_TYPES.ImportSpecifier &&
@@ -61,8 +59,8 @@ function isNamedImportSpecifier(specifier: TSESTree.ImportClause): specifier is 
   );
 }
 
-function shouldReportMissingTypeScript(filename: string, options: Options[0] | undefined): boolean {
-  return options?.tsconfig !== false && typescriptFilePattern.test(filename) && !hasTypeScriptModule();
+function shouldReportMissingTypeScript(_filename: string, options: Options[0] | undefined): boolean {
+  return options?.tsconfig !== false && !hasTypeScriptModule();
 }
 
 const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
@@ -103,7 +101,7 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
     ],
     messages: {
       missingTypeScript:
-        "prefer-source-imports requires the 'typescript' package to lint TypeScript files when tsconfig resolution is enabled. Install 'typescript' in the consuming project or set 'tsconfig: false'.",
+        "prefer-source-imports requires the 'typescript' package when tsconfig resolution is enabled. Install 'typescript' in the consuming project or set 'tsconfig: false'.",
       preferSourceImport: "Import '{{name}}' directly from '{{source}}' instead of barrel '{{barrel}}'.",
       preferSourceImports: "Import directly from source modules instead of barrel '{{barrel}}'.",
     },

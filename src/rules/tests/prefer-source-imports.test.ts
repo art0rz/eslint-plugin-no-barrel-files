@@ -34,6 +34,17 @@ ruleTester.run('prefer-source-imports', preferSourceImports, {
     },
     {
       code: `import { Foo } from './barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.js'),
+      errors: [{ messageId: 'missingTypeScript' }],
+      before: () => {
+        __private__.setTypeScriptModuleLoaderForTests(() => null);
+      },
+      after: () => {
+        __private__.setTypeScriptModuleLoaderForTests(null);
+      },
+    },
+    {
+      code: `import { Foo } from './barrel';`,
       filename: path.join(fixtureDirectory, 'consumer.ts'),
       options: [
         {

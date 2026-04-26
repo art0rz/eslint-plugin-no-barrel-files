@@ -82,6 +82,7 @@ describe('prefer-source-imports private helpers', () => {
     expect(__private__.getReExportMeta('value:Foo')).toEqual({ exportedName: 'Foo', isTypeOnly: false });
     expect(__private__.shouldReportMissingTypeScript('/repo/src/file.ts', {})).toBe(false);
     expect(__private__.shouldReportMissingTypeScript('/repo/src/file.js', {})).toBe(false);
+    expect(__private__.shouldReportMissingTypeScript('/repo/src/file.js', { tsconfig: false })).toBe(false);
   });
 
   it('covers optional TypeScript dependency helpers', () => {
@@ -90,7 +91,9 @@ describe('prefer-source-imports private helpers', () => {
     expect(__private__.getTypeScriptModule()).toBeNull();
     expect(__private__.hasTypeScriptModule()).toBe(false);
     expect(__private__.shouldReportMissingTypeScript('/repo/src/file.ts', {})).toBe(true);
+    expect(__private__.shouldReportMissingTypeScript('/repo/src/file.js', {})).toBe(true);
     expect(__private__.shouldReportMissingTypeScript('/repo/src/file.ts', { tsconfig: false })).toBe(false);
+    expect(__private__.shouldReportMissingTypeScript('/repo/src/file.js', { tsconfig: false })).toBe(false);
     expect(__private__.getTsconfigPath({}, '/repo/src/file.ts')).toBeNull();
     expect(__private__.resolveWithTsconfig({}, '/repo/src/file.ts', '@app/foo', new Map())).toBeNull();
 
