@@ -47,25 +47,14 @@ This plugin supports:
 ```js
 import noBarrelFiles from 'eslint-plugin-no-barrel-files';
 
-export default [
-  ...noBarrelFiles.configs.recommended,
-  {
-    rules: {
-      'no-barrel-files/prefer-source-imports': 'error',
-    },
-  },
-];
+export default [...noBarrelFiles.configs['flat/recommended']];
 ```
 
 ### Legacy Config
 
 ```js
 module.exports = {
-  plugins: ['no-barrel-files'],
-  rules: {
-    'no-barrel-files/no-barrel-files': 'error',
-    'no-barrel-files/prefer-source-imports': 'error',
-  },
+  extends: ['plugin:no-barrel-files/recommended'],
 };
 ```
 
@@ -73,17 +62,19 @@ module.exports = {
 
 The plugin exports:
 
+- `configs.default`
 - `configs.recommended`
+- `configs["flat/default"]`
 - `configs["flat/recommended"]`
+- `configs["legacy-default"]`
 - `configs["legacy-recommended"]`
 - `flat`
 
-The recommended configs currently enable only `no-barrel-files`.
+Config behavior:
 
-That is intentional:
-
-- `no-barrel-files` is safe to adopt immediately if you want to block new barrels
-- `prefer-source-imports` is more migration-oriented, so it stays opt-in
+- `configs.default` and `configs["legacy-default"]` enable only `no-barrel-files`
+- `configs.recommended`, `configs["flat/recommended"]`, and `configs["legacy-recommended"]` enable both rules
+- `flat` is the flat-config equivalent of the default config
 
 ## Rules
 
@@ -213,14 +204,14 @@ Example:
 
 ## Configuration Examples
 
-### Use The Recommended Config Only
+### Use The Default Config Only
 
 This blocks new barrel files, but does not yet enforce direct source imports.
 
 ```js
 import noBarrelFiles from 'eslint-plugin-no-barrel-files';
 
-export default [...noBarrelFiles.configs.recommended];
+export default [...noBarrelFiles.configs['flat/default']];
 ```
 
 ### Enable Both Rules
@@ -230,14 +221,7 @@ This is a good migration setup.
 ```js
 import noBarrelFiles from 'eslint-plugin-no-barrel-files';
 
-export default [
-  ...noBarrelFiles.configs.recommended,
-  {
-    rules: {
-      'no-barrel-files/prefer-source-imports': 'error',
-    },
-  },
-];
+export default [...noBarrelFiles.configs.recommended];
 ```
 
 ### Use Manual Alias Resolution Only
@@ -302,9 +286,9 @@ Typical rollout options:
 - `prefer-source-imports` depends on being able to resolve the barrel and the underlying source module.
 - `prefer-source-imports` uses the consuming project's `typescript` installation for tsconfig parsing and module resolution.
 - If `prefer-source-imports` runs on a TypeScript file without `typescript` installed and tsconfig resolution is enabled, the rule reports a configuration error instead of crashing the plugin.
+- The same configuration error is reported for JavaScript files when the rule needs tsconfig-based resolution but `typescript` is not installed.
 - Alias preservation only happens when reverse alias lookup is unique.
 - If multiple aliases point to the same file, the fixer may fall back to a relative path or skip autofix depending on `fixStyle`.
-- The plugin does not currently ship a recommended config that enables both rules by default.
 
 ## Contributing
 

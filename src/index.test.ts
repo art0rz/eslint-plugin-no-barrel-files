@@ -9,14 +9,36 @@ describe('plugin entrypoint', () => {
       namespace: 'no-barrel-files',
     });
 
-    expect(plugin.configs?.recommended).toEqual([plugin.flat]);
-    expect(plugin.configs?.['flat/recommended']).toEqual([plugin.flat]);
-    expect(plugin.configs?.['legacy-recommended']).toEqual({
+    expect(plugin.configs?.default).toEqual({
       plugins: ['no-barrel-files'],
       rules: {
         'no-barrel-files/no-barrel-files': 'error',
       },
     });
+    expect(plugin.configs?.recommended).toEqual({
+      plugins: ['no-barrel-files'],
+      rules: {
+        'no-barrel-files/no-barrel-files': 'error',
+        'no-barrel-files/prefer-source-imports': 'error',
+      },
+    });
+    expect(plugin.configs?.['flat/default']).toEqual([plugin.flat]);
+    expect(plugin.configs?.['flat/recommended']).toEqual([
+      {
+        plugins: {
+          'no-barrel-files': {
+            meta: plugin.meta,
+            rules: plugin.rules,
+          },
+        },
+        rules: {
+          'no-barrel-files/no-barrel-files': 'error',
+          'no-barrel-files/prefer-source-imports': 'error',
+        },
+      },
+    ]);
+    expect(plugin.configs?.['legacy-default']).toEqual(plugin.configs?.default);
+    expect(plugin.configs?.['legacy-recommended']).toEqual(plugin.configs?.recommended);
 
     expect(plugin.rules).toHaveProperty('prefer-source-imports');
   });
