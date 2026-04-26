@@ -31,7 +31,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
       - name: Determine release override
+        id: override
         run: |
           release_as=''
           if [ "${{ inputs.major_bump }}" = "true" ]; then
@@ -39,7 +43,6 @@ jobs:
             release_as="$(node -p "const [major] = '${current_version}'.split('.'); String(Number(major) + 1) + '.0.0'")"
           fi
           echo "release_as=${release_as}" >> "$GITHUB_OUTPUT"
-        id: override
       - name: Close existing release PR
         if: ${{ inputs.close_existing_pr }}
         env:
@@ -57,12 +60,25 @@ jobs:
           if [ -n "${pr_number}" ]; then
             gh pr close "${pr_number}" --comment "Closed automatically before recreating this release PR as version ${{ steps.override.outputs.release_as }}."
           fi
+      - name: Create Release-As commit
+        if: ${{ steps.override.outputs.release_as != '' }}
+        run: |
+          if git log -1 --pretty=%B | grep -Fq "Release-As: ${{ steps.override.outputs.release_as }}"; then
+            echo "Latest commit already carries Release-As: ${{ steps.override.outputs.release_as }}"
+            exit 0
+          fi
+
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit --allow-empty \
+            -m "chore: release ${{ steps.override.outputs.release_as }}" \
+            -m "Release-As: ${{ steps.override.outputs.release_as }}"
+          git push origin HEAD:main
       - uses: googleapis/release-please-action@v4
         with:
           config-file: .github/release-please-config.json
           manifest-file: .release-please-manifest.json
           target-branch: main
-          release-as: ${{ steps.override.outputs.release_as }}
       - name: Sync release PR title
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
