@@ -60,21 +60,12 @@ module.exports = {
 
 ## Included Configs
 
-The plugin exports:
+The plugin exports two recommended configs:
 
-- `configs.default`
-- `configs.recommended`
-- `configs["flat/default"]`
-- `configs["flat/recommended"]`
-- `configs["legacy-default"]`
-- `configs["legacy-recommended"]`
-- `flat`
+- `configs.recommended` for legacy config
+- `configs["flat/recommended"]` for flat config
 
-Config behavior:
-
-- `configs.default` and `configs["legacy-default"]` enable only `no-barrel-files`
-- `configs.recommended`, `configs["flat/recommended"]`, and `configs["legacy-recommended"]` enable both rules
-- `flat` is the flat-config equivalent of the default config
+Both enable `no-barrel-files` and `prefer-source-imports`.
 
 ## Rules
 
@@ -204,14 +195,23 @@ Example:
 
 ## Configuration Examples
 
-### Use The Default Config Only
+### Enable Only `no-barrel-files`
 
 This blocks new barrel files, but does not yet enforce direct source imports.
 
 ```js
 import noBarrelFiles from 'eslint-plugin-no-barrel-files';
 
-export default [...noBarrelFiles.configs['flat/default']];
+export default [
+  {
+    plugins: {
+      'no-barrel-files': noBarrelFiles,
+    },
+    rules: {
+      'no-barrel-files/no-barrel-files': 'error',
+    },
+  },
+];
 ```
 
 ### Enable Both Rules
