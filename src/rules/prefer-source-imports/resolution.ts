@@ -154,9 +154,7 @@ export function resolveWithManualPaths(
     for (const target of targets) {
       const candidateSpecifier = applyAliasTarget(target, wildcardValue);
       const candidateBasePath = path.resolve(cwd, candidateSpecifier);
-      const resolvedFilePath =
-        resolveModuleFile(importerFilename, candidateSpecifier) ??
-        resolveModuleFile(importerFilename, candidateBasePath);
+      const resolvedFilePath = resolveModuleFile(importerFilename, candidateBasePath);
 
       if (resolvedFilePath) {
         return resolvedFilePath;
@@ -295,15 +293,21 @@ export function reverseResolveTsconfigAlias(
     return null;
   }
 
+  const configDirectory = path.dirname(tsconfigInfo.configFilePath);
+  const baseUrl = tsconfigInfo.compilerOptions.baseUrl;
+  const pathsBaseDirectory = baseUrl
+    ? path.isAbsolute(baseUrl)
+      ? baseUrl
+      : path.resolve(configDirectory, baseUrl)
+    : configDirectory;
+
   const candidateAliases = Object.entries(paths as Record<string, string[]>)
     .flatMap(([pattern, targets]) =>
       targets.map(target => {
         if (target.includes('*')) {
           const [rawPrefix = '', rawSuffix = ''] = target.split('*');
           const normalizedResolvedFilePath = normalizeModulePath(resolvedFilePath);
-          const normalizedPrefix = normalizeModulePath(
-            path.resolve(path.dirname(tsconfigInfo.configFilePath), rawPrefix),
-          );
+          const normalizedPrefix = normalizeModulePath(path.resolve(pathsBaseDirectory, rawPrefix));
           const normalizedSuffix = normalizeModulePath(rawSuffix);
 
           if (
@@ -321,10 +325,7 @@ export function reverseResolveTsconfigAlias(
           return buildAliasSpecifier(pattern, wildcardValue.replace(/^\//, ''));
         }
 
-        const targetFilePath = resolveModuleFile(
-          importerFilename,
-          path.resolve(path.dirname(tsconfigInfo.configFilePath), target),
-        );
+        const targetFilePath = resolveModuleFile(importerFilename, path.resolve(pathsBaseDirectory, target));
 
         return targetFilePath === resolvedFilePath ? pattern : null;
       }),
