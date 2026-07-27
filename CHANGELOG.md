@@ -12,6 +12,15 @@
 
 * support ESLint 10 ([71dba90](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/71dba909c52504f2aa17497db5714624121486b2))
 
+## [2.1.1](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/eslint-plugin-no-barrel-files-v2.1.0...eslint-plugin-no-barrel-files-v2.1.1) (2026-07-27)
+
+
+### Performance Improvements
+
+* avoid unnecessary import analysis ([e445136](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/e4451360f855c9d6e50a18fe10b564da6f79aabb))
+* share TypeScript resolution caches ([d0e43fa](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/d0e43fa603d674320b5404c01b9cf6c21a87f79b))
+* skip external module resolution ([ddc726d](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/ddc726df8ab69ea3c203d1346ec99e2ce609684b))
+
 ## [2.1.0](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/eslint-plugin-no-barrel-files-v2.0.2...eslint-plugin-no-barrel-files-v2.1.0) (2026-07-27)
 
 
