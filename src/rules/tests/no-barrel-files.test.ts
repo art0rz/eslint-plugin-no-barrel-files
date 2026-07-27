@@ -43,6 +43,13 @@ ruleTester.run('no-barrel-files', noBarrelFiles, {
     },
     {
       code: `
+      export { Foo };
+      import { Foo } from "./foo";
+      `,
+      errors: [{ messageId: 'noReExport' }],
+    },
+    {
+      code: `
       import Foo from "./foo";
       export { Foo };
       `,
