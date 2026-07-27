@@ -12,6 +12,19 @@
 
 * support ESLint 10 ([71dba90](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/71dba909c52504f2aa17497db5714624121486b2))
 
+## [2.1.0](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/eslint-plugin-no-barrel-files-v2.0.2...eslint-plugin-no-barrel-files-v2.1.0) (2026-07-27)
+
+
+### Features
+
+* resolve local re-export barrels ([627ac19](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/627ac196fe9af6a4a4d1cf9516dcdf6ba93bad19))
+* support TypeScript 6 ([fa1176a](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/fa1176a38c96d6f4dbb6495433a9eada9b9d64f2))
+
+
+### Bug Fixes
+
+* resolve aliases from configured base paths ([31fe0f8](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/31fe0f8bbc9c9177b6df89768682c0c6f89dda15))
+
 ## [2.0.2](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/eslint-plugin-no-barrel-files-v2.0.1...eslint-plugin-no-barrel-files-v2.0.2) (2026-07-27)
 
 
