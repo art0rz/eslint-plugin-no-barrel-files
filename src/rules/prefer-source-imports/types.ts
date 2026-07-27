@@ -1,5 +1,5 @@
 import { TSESTree } from '@typescript-eslint/utils';
-import type { CompilerOptions } from 'typescript';
+import type { CompilerOptions, ModuleResolutionCache } from 'typescript';
 
 export type MessageIds = 'missingTypeScript' | 'preferSourceImport' | 'preferSourceImports';
 
@@ -43,12 +43,14 @@ export type AnalysisCaches = {
 export type TsconfigInfo = {
   compilerOptions: CompilerOptions;
   configFilePath: string;
+  moduleResolutionCache: ModuleResolutionCache;
 };
 
 export type ResolutionCaches = {
   barrelAnalyses: Map<string, BarrelAnalysis | null>;
   importResolutions: Map<string, string | null>;
   tsconfigInfo: Map<string, TsconfigInfo | null>;
+  tsconfigPaths: Map<string, string | null>;
 };
 
 export type ManualAliasMapping = {
