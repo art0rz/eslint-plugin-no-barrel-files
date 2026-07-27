@@ -36,6 +36,7 @@ let loadTypeScriptModule: () => TypeScriptModule | null = () => {
 
 const sharedTsconfigCache = new Map<string, TsconfigInfo | null>();
 const sharedTsconfigPathCache = new Map<string, string | null>();
+const sharedBarrelAnalysisCache = new Map<string, BarrelAnalysis | null>();
 
 export function createResolutionCaches(
   sharedTsconfigCache: Map<string, TsconfigInfo | null> = new Map<string, TsconfigInfo | null>(),
@@ -50,12 +51,16 @@ export function createResolutionCaches(
 }
 
 export function createSharedResolutionCaches(): ResolutionCaches {
-  return createResolutionCaches(sharedTsconfigCache, sharedTsconfigPathCache);
+  return {
+    ...createResolutionCaches(sharedTsconfigCache, sharedTsconfigPathCache),
+    barrelAnalyses: sharedBarrelAnalysisCache,
+  };
 }
 
 export function setTypeScriptModuleLoaderForTests(loader: (() => TypeScriptModule | null) | null): void {
   sharedTsconfigCache.clear();
   sharedTsconfigPathCache.clear();
+  sharedBarrelAnalysisCache.clear();
 
   loadTypeScriptModule =
     loader ??
@@ -195,6 +200,29 @@ export function resolveWithManualPaths(
   return null;
 }
 
+function resolveWithBaseUrl(importerFilename: string, specifier: string, tsconfigInfo: TsconfigInfo): string | null {
+  const baseUrl = tsconfigInfo.compilerOptions.baseUrl;
+
+  if (!baseUrl) {
+    return null;
+  }
+
+  const configDirectory = path.dirname(tsconfigInfo.configFilePath);
+  const baseUrlDirectory = path.isAbsolute(baseUrl) ? baseUrl : path.resolve(configDirectory, baseUrl);
+
+  return resolveModuleFile(importerFilename, path.resolve(baseUrlDirectory, specifier));
+}
+
+function hasMatchingTsconfigPath(specifier: string, tsconfigInfo: TsconfigInfo): boolean {
+  const paths = tsconfigInfo.compilerOptions.paths;
+
+  return (
+    !!paths &&
+    typeof paths === 'object' &&
+    Object.keys(paths).some(pattern => matchesAliasPattern(specifier, pattern) !== null)
+  );
+}
+
 export function getManualAliasMappings(options: Options[0] | undefined): Array<ManualAliasMapping> {
   const configuredPaths = options?.paths;
 
@@ -227,6 +255,16 @@ export function resolveWithTsconfig(
   const tsconfigInfo = getTsconfigInfo(options, importerFilename, tsconfigCache, cwd, tsconfigPathCache);
 
   if (!tsconfigInfo) {
+    return null;
+  }
+
+  const baseUrlResolution = resolveWithBaseUrl(importerFilename, specifier, tsconfigInfo);
+
+  if (baseUrlResolution) {
+    return baseUrlResolution;
+  }
+
+  if (!hasMatchingTsconfigPath(specifier, tsconfigInfo)) {
     return null;
   }
 

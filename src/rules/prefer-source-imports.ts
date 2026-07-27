@@ -64,6 +64,10 @@ function shouldReportMissingTypeScript(_filename: string, options: Options[0] | 
   return options?.tsconfig !== false && !hasTypeScriptModule();
 }
 
+// ESLint creates a rule instance for every file. Parsed barrel modules are
+// immutable for this rule's fixes, so share them across those instances.
+const sharedAnalysisCaches = createAnalysisCaches();
+
 const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
   defaultOptions: [{}],
   meta: {
@@ -111,7 +115,7 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
     const [options] = context.options;
     const sourceCode = context.sourceCode;
     const barrelExportCache = new Map<string, BarrelAnalysis | null>();
-    const analysisCaches = createAnalysisCaches();
+    const analysisCaches = sharedAnalysisCaches;
     const resolutionCaches = createSharedResolutionCaches();
     const cwd = process.cwd();
     const missingTypeScript = shouldReportMissingTypeScript(context.filename, options);
