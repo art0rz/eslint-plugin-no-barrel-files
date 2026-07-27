@@ -811,6 +811,25 @@ describe('prefer-source-imports private helpers', () => {
         tempDir,
       ),
     ).toBe(path.join(tempDir, 'packages/app/src/foo.ts'));
+    expect(
+      __private__.resolveWithTsconfig(
+        { tsconfig: path.join(tempDir, 'tsconfig-paths-without-base-url.json') },
+        importer,
+        '@config/foo',
+        new Map(),
+        tempDir,
+      ),
+    ).toBe(path.join(tempDir, 'src/foo.ts'));
+    expect(
+      __private__.resolveWithTsconfig(
+        { tsconfig: path.join(tempDir, 'tsconfig-no-paths.json') },
+        importer,
+        'src/foo',
+        new Map(),
+        tempDir,
+      ),
+    ).toBe(path.join(tempDir, 'src/foo.ts'));
+    expect(__private__.resolveWithTsconfig({}, importer, '@app/missing', new Map(), tempDir)).toBeNull();
 
     expect(__private__.resolveImport({}, resolutionCaches, importer, './src/foo', tempDir)).toBe(
       path.join(tempDir, 'src/foo.ts'),
@@ -1015,6 +1034,36 @@ describe('prefer-source-imports private helpers', () => {
 
     vi.spyOn(fs, 'existsSync').mockReturnValue(false);
     expect(__private__.resolveWithTsconfig({}, importer, '@app/foo', new Map(), validDir)).toBeNull();
+  });
+
+  it('supports case-insensitive TypeScript resolution caches and relative base URLs', () => {
+    const tempDir = makeTempDir();
+    const importer = path.join(tempDir, 'consumer.ts');
+    const tsconfigPath = path.join(tempDir, 'tsconfig.json');
+
+    writeFiles(tempDir, {
+      'src/foo.ts': 'export const Foo = 1;',
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: { baseUrl: '.', paths: { '@app/*': ['src/*'] } },
+      }),
+    });
+
+    __private__.setTypeScriptModuleLoaderForTests(
+      () =>
+        ({
+          ...typescript,
+          sys: { ...typescript.sys, useCaseSensitiveFileNames: false },
+          parseJsonConfigFileContent: (...args: Parameters<typeof typescript.parseJsonConfigFileContent>) => {
+            const parsedConfig = typescript.parseJsonConfigFileContent(...args);
+
+            return { ...parsedConfig, options: { ...parsedConfig.options, baseUrl: '.' } };
+          },
+        }) as any,
+    );
+
+    expect(
+      __private__.resolveWithTsconfig({ tsconfig: tsconfigPath }, importer, '@app/foo', new Map(), tempDir),
+    ).toBeNull();
   });
 
   it('covers alias-preservation branches and cached barrel analysis', () => {
