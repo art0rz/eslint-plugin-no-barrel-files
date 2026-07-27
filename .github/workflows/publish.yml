@@ -1,17 +1,30 @@
-name: release
+name: publish
 
 on:
-  release:
-    types:
-      - published
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: npm distribution tag to publish
+        required: true
+        type: choice
+        options: [canary, stable]
+      ref:
+        description: Git ref to publish (defaults to the workflow ref)
+        required: false
+        type: string
 
 concurrency:
-  group: release-${{ github.event.release.tag_name || github.ref }}
+  group: publish-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
   id-token: write
+
+env:
+  PUBLISH_REF: ${{ inputs.ref || github.sha }}
 
 jobs:
   actionlint:
@@ -19,7 +32,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ env.PUBLISH_REF }}
       - uses: rhysd/actionlint@v1.7.12
 
   validate:
@@ -31,7 +44,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ env.PUBLISH_REF }}
       - uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -49,7 +62,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ env.PUBLISH_REF }}
       - uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -72,7 +85,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ env.PUBLISH_REF }}
       - uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -86,56 +99,51 @@ jobs:
 
   package-smoke:
     runs-on: ubuntu-latest
-    permissions:
-      attestations: write
-      id-token: write
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ env.PUBLISH_REF }}
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
       - run: npm ci --include=dev
-      - run: npm run build
       - run: npm run pack:smoke
-      - run: mkdir -p artifacts
-      - run: npm pack --pack-destination artifacts
-      - uses: actions/attest-build-provenance@v2
-        with:
-          subject-path: artifacts/*.tgz
 
-  audit:
+  publish-canary:
+    if: >-
+      ${{ (github.event_name == 'push' && !startsWith(github.event.head_commit.message, 'chore(main): release')) ||
+          (github.event_name == 'workflow_dispatch' && inputs.channel == 'canary') }}
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.release.tag_name }}
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci --include=dev
-      - run: npm audit --audit-level=high
-        continue-on-error: true
-
-  publish:
-    runs-on: ubuntu-latest
-    if: ${{ !github.event.release.prerelease }}
     needs: [actionlint, validate, coverage, consumer-smoke, package-smoke]
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ env.PUBLISH_REF }}
+          fetch-depth: 0
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
           registry-url: https://registry.npmjs.org
       - run: npm ci --include=dev
-      - name: Publish stable package
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
-        run: npm publish --access public
+      - run: npm run version:canary
+      - run: npm publish --tag canary --access public
+
+  publish-stable:
+    if: >-
+      ${{ (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(main): release')) ||
+          (github.event_name == 'workflow_dispatch' && inputs.channel == 'stable') }}
+    runs-on: ubuntu-latest
+    needs: [actionlint, validate, coverage, consumer-smoke, package-smoke]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.PUBLISH_REF }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - run: npm ci --include=dev
+      - run: npm publish --access public
