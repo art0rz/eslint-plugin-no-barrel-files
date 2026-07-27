@@ -613,6 +613,8 @@ describe('prefer-source-imports private helpers', () => {
     writeFiles(tempDir, {
       'src/foo.ts': 'export const Foo = 1;',
       'src/index.ts': 'export const Index = 1;',
+      'nested/src/foo.ts': 'export const ShadowedFoo = 1;',
+      'packages/app/src/foo.ts': 'export const BaseUrlFoo = 1;',
       'tsconfig.json': JSON.stringify(
         {
           compilerOptions: {
@@ -642,6 +644,18 @@ describe('prefer-source-imports private helpers', () => {
             baseUrl: '.',
             paths: {
               '@exact': ['src/foo'],
+            },
+          },
+        },
+        null,
+        2,
+      ),
+      'tsconfig-base-url.json': JSON.stringify(
+        {
+          compilerOptions: {
+            baseUrl: './packages/app',
+            paths: {
+              '@base/*': ['src/*'],
             },
           },
         },
@@ -688,6 +702,14 @@ describe('prefer-source-imports private helpers', () => {
     expect(__private__.resolveWithManualPaths(options, importer, '@manual/foo', tempDir)).toBe(
       path.join(tempDir, 'src/foo.ts'),
     );
+    expect(
+      __private__.resolveWithManualPaths(
+        { paths: { '@manual/*': 'src/*' } },
+        path.join(tempDir, 'nested/consumer.ts'),
+        '@manual/foo',
+        tempDir,
+      ),
+    ).toBe(path.join(tempDir, 'src/foo.ts'));
     expect(__private__.resolveWithManualPaths(options, importer, '@missing/foo', tempDir)).toBeNull();
 
     expect(__private__.getTsconfigPath({ tsconfig: false }, importer, tempDir)).toBeNull();
@@ -708,6 +730,15 @@ describe('prefer-source-imports private helpers', () => {
       path.join(tempDir, 'src/foo.ts'),
     );
     expect(__private__.resolveWithTsconfig({ tsconfig: false }, importer, '@app/foo', new Map(), tempDir)).toBeNull();
+    expect(
+      __private__.resolveWithTsconfig(
+        { tsconfig: path.join(tempDir, 'tsconfig-base-url.json') },
+        importer,
+        '@base/foo',
+        new Map(),
+        tempDir,
+      ),
+    ).toBe(path.join(tempDir, 'packages/app/src/foo.ts'));
 
     expect(__private__.resolveImport({}, resolutionCaches, importer, './src/foo', tempDir)).toBe(
       path.join(tempDir, 'src/foo.ts'),
@@ -744,6 +775,15 @@ describe('prefer-source-imports private helpers', () => {
         tempDir,
       ),
     ).toBeNull();
+    expect(
+      __private__.reverseResolveTsconfigAlias(
+        { tsconfig: path.join(tempDir, 'tsconfig-base-url.json') },
+        importer,
+        path.join(tempDir, 'packages/app/src/foo.ts'),
+        new Map(),
+        tempDir,
+      ),
+    ).toBe('@base/foo');
     expect(
       __private__.reverseResolveTsconfigAlias(
         { tsconfig: path.join(tempDir, 'tsconfig-no-paths.json') },
@@ -809,6 +849,22 @@ describe('prefer-source-imports private helpers', () => {
     );
 
     expect(tsAlias).toBe('./src/foo');
+    expect(
+      __private__.getPreferredSourceSpecifier(
+        { fixStyle: 'preserve-alias', tsconfig: path.join(tempDir, 'tsconfig-base-url.json') },
+        importer,
+        '@base/barrel',
+        {
+          importedName: 'Foo',
+          resolvedFilePath: path.join(tempDir, 'packages/app/src/foo.ts'),
+          sourceSpecifier: './foo',
+          isTypeOnly: false,
+          fromExportAll: false,
+        },
+        new Map(),
+        tempDir,
+      ),
+    ).toBe('@base/foo');
     expect(
       __private__.getPreferredSourceSpecifier(
         {},
