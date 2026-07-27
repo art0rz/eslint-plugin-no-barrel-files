@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import packageJson from '../package.json';
 import plugin from './index';
 
 describe('plugin entrypoint', () => {
   it('exposes ESLint 10-compatible metadata and config exports', () => {
     expect(plugin.meta).toEqual({
       name: 'eslint-plugin-no-barrel-files',
-      version: '1.4.0',
+      version: packageJson.version,
       namespace: 'no-barrel-files',
     });
 
