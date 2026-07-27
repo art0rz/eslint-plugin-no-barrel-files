@@ -140,6 +140,12 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
           return;
         }
 
+        const namedSpecifiers = node.specifiers.filter(isNamedImportSpecifier);
+
+        if (namedSpecifiers.length === 0) {
+          return;
+        }
+
         const importerFilename = context.filename;
         const barrelFilePath = resolveImport(options, resolutionCaches, importerFilename, node.source.value, cwd);
 
@@ -157,12 +163,6 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
         );
 
         if (!barrelAnalysis) {
-          return;
-        }
-
-        const namedSpecifiers = node.specifiers.filter(isNamedImportSpecifier);
-
-        if (namedSpecifiers.length === 0) {
           return;
         }
 
