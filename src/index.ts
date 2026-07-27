@@ -1,4 +1,5 @@
 import { TSESLint } from '@typescript-eslint/utils';
+import packageJson from '../package.json';
 import noBarrelFiles from './rules/no-barrel-files';
 import preferSourceImports from './rules/prefer-source-imports';
 
@@ -9,7 +10,7 @@ const rules = {
 
 const pluginMeta = {
   name: 'eslint-plugin-no-barrel-files',
-  version: '1.4.0',
+  version: packageJson.version,
 } satisfies NonNullable<TSESLint.FlatConfig.Plugin['meta']>;
 
 const runtimeMeta = {
