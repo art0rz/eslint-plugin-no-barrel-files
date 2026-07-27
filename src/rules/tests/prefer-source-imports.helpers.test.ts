@@ -510,6 +510,32 @@ describe('prefer-source-imports private helpers', () => {
     const program = {
       body: [
         {
+          type: AST_NODE_TYPES.ImportDeclaration,
+          importKind: 'value',
+          source: { type: AST_NODE_TYPES.Literal, value: './value' },
+          specifiers: [
+            {
+              type: AST_NODE_TYPES.ImportSpecifier,
+              importKind: 'value',
+              imported: { type: AST_NODE_TYPES.Identifier, name: 'Foo' },
+              local: { type: AST_NODE_TYPES.Identifier, name: 'LocalFoo' },
+            },
+          ],
+        },
+        {
+          type: AST_NODE_TYPES.ExportNamedDeclaration,
+          exportKind: 'value',
+          source: null,
+          specifiers: [
+            {
+              type: AST_NODE_TYPES.ExportSpecifier,
+              exportKind: 'value',
+              exported: { type: AST_NODE_TYPES.Literal, value: 'SkippedLocal' },
+              local: { type: AST_NODE_TYPES.Identifier, name: 'LocalFoo' },
+            },
+          ],
+        },
+        {
           type: AST_NODE_TYPES.ExportNamedDeclaration,
           exportKind: 'value',
           source: { type: AST_NODE_TYPES.Literal, value: './missing-explicit' },

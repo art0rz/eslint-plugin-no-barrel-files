@@ -19,6 +19,26 @@ ruleTester.run('prefer-source-imports', preferSourceImports, {
       code: `import { Missing } from './barrel';`,
       filename: path.join(fixtureDirectory, 'consumer.ts'),
     },
+    {
+      code: `import { LocalValue } from './local-barrel-value';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+    },
+    {
+      code: `import { Missing } from './local-barrel-unresolved';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+    },
+    {
+      code: `import { LocalSelf } from './local-barrel-self';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+    },
+    {
+      code: `import { TypeFoo } from './local-barrel-invalid-type';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+    },
+    {
+      code: `import { LocalNamespace } from './local-barrel-namespace';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+    },
   ],
   invalid: [
     {
@@ -70,6 +90,36 @@ ruleTester.run('prefer-source-imports', preferSourceImports, {
       code: `import { Baz } from './barrel';`,
       filename: path.join(fixtureDirectory, 'consumer.ts'),
       output: `import { Bar as Baz } from './bar';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { LocalFoo } from './local-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import { Foo as LocalFoo } from './foo';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { LocalDefaultThing } from './local-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import { default as LocalDefaultThing } from './default-thing';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import type { LocalTypeFoo } from './local-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import type { TypeFoo as LocalTypeFoo } from './types';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import type { LocalClassThing } from './local-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import type { ClassThing as LocalClassThing } from './class-thing';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { LocalRecursiveFoo } from './local-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import { RecursiveFoo as LocalRecursiveFoo } from './recursive-foo';`,
       errors: [{ messageId: 'preferSourceImports' }],
     },
     {
