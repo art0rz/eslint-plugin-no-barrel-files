@@ -17,29 +17,15 @@ const runtimeMeta = {
   namespace: 'no-barrel-files',
 } as const;
 
-const flatDefaultConfig = {
+const flatRecommendedConfig = {
   plugins: {
     'no-barrel-files': { meta: runtimeMeta, rules } as Omit<TSESLint.FlatConfig.Plugin, 'configs'>,
   },
   rules: {
     'no-barrel-files/no-barrel-files': 'error',
-  },
-} satisfies TSESLint.FlatConfig.Config;
-
-const flatRecommendedConfig = {
-  ...flatDefaultConfig,
-  rules: {
-    ...flatDefaultConfig.rules,
     'no-barrel-files/prefer-source-imports': 'error',
   },
 } satisfies TSESLint.FlatConfig.Config;
-
-const legacyDefaultConfig = {
-  plugins: ['no-barrel-files'],
-  rules: {
-    'no-barrel-files/no-barrel-files': 'error',
-  },
-} as const;
 
 const legacyRecommendedConfig = {
   plugins: ['no-barrel-files'],
@@ -50,22 +36,16 @@ const legacyRecommendedConfig = {
 } as const;
 
 const configs = {
-  default: legacyDefaultConfig,
   recommended: legacyRecommendedConfig,
-  'flat/default': [flatDefaultConfig],
   'flat/recommended': [flatRecommendedConfig],
-  'legacy-default': legacyDefaultConfig,
-  'legacy-recommended': legacyRecommendedConfig,
 } as const;
 
 const plugin = {
   meta: runtimeMeta,
   configs: configs as unknown as TSESLint.FlatConfig.Plugin['configs'],
   rules,
-  flat: flatDefaultConfig,
 } as unknown as TSESLint.FlatConfig.Plugin & {
   configs: typeof configs;
-  flat: TSESLint.FlatConfig.Config;
   meta: typeof runtimeMeta;
 };
 
