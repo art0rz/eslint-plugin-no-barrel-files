@@ -12,6 +12,19 @@
 
 * support ESLint 10 ([71dba90](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/71dba909c52504f2aa17497db5714624121486b2))
 
+## [2.0.2](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/eslint-plugin-no-barrel-files-v2.0.1...eslint-plugin-no-barrel-files-v2.0.2) (2026-07-27)
+
+
+### Bug Fixes
+
+* derive plugin metadata version ([8d1ffab](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/8d1ffab5eac7276857020cedf26640c21869f14b))
+* detect imports declared after exports ([3f0011e](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/3f0011e8ed03455ffed6f38eec51e4e1ed3f7496))
+
+
+### Miscellaneous Chores
+
+* release 2.0.2 ([91a17f8](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/91a17f842f44d756c68ee69ec0b6b45b553fd761))
+
 ## [2.0.1](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/eslint-plugin-no-barrel-files-v2.0.0...eslint-plugin-no-barrel-files-v2.0.1) (2026-07-27)
 
 
