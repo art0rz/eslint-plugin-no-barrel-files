@@ -29,6 +29,7 @@ import {
 } from './prefer-source-imports/path-utils';
 import {
   createResolutionCaches,
+  createSharedResolutionCaches,
   getBarrelAnalysis,
   getManualAliasMappings,
   getPreferredSourceSpecifier,
@@ -111,7 +112,7 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
     const sourceCode = context.sourceCode;
     const barrelExportCache = new Map<string, BarrelAnalysis | null>();
     const analysisCaches = createAnalysisCaches();
-    const resolutionCaches = createResolutionCaches();
+    const resolutionCaches = createSharedResolutionCaches();
     const cwd = process.cwd();
     const missingTypeScript = shouldReportMissingTypeScript(context.filename, options);
 
@@ -177,6 +178,7 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
                 explicitReExport,
                 resolutionCaches.tsconfigInfo,
                 cwd,
+                resolutionCaches.tsconfigPaths,
               ),
               specifier,
               reExportTarget: explicitReExport,
@@ -198,6 +200,7 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
               exportAllReExport,
               resolutionCaches.tsconfigInfo,
               cwd,
+              resolutionCaches.tsconfigPaths,
             ),
             specifier,
             reExportTarget: exportAllReExport,
@@ -242,6 +245,7 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
                   reExportTarget,
                   resolutionCaches.tsconfigInfo,
                   cwd,
+                  resolutionCaches.tsconfigPaths,
                 ) ?? reExportTarget.sourceSpecifier,
             },
           });
@@ -260,6 +264,7 @@ export const __private__ = {
   collectExportedBindings,
   createAnalysisCaches,
   createResolutionCaches,
+  createSharedResolutionCaches,
   getBarrelAnalysis,
   getManualAliasMappings,
   getTypeScriptModule,

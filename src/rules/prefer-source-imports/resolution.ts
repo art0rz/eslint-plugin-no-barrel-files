@@ -34,17 +34,29 @@ let loadTypeScriptModule: () => TypeScriptModule | null = () => {
   }
 };
 
+const sharedTsconfigCache = new Map<string, TsconfigInfo | null>();
+const sharedTsconfigPathCache = new Map<string, string | null>();
+
 export function createResolutionCaches(
   sharedTsconfigCache: Map<string, TsconfigInfo | null> = new Map<string, TsconfigInfo | null>(),
+  sharedTsconfigPathCache: Map<string, string | null> = new Map<string, string | null>(),
 ): ResolutionCaches {
   return {
     barrelAnalyses: new Map<string, BarrelAnalysis | null>(),
     importResolutions: new Map<string, string | null>(),
     tsconfigInfo: sharedTsconfigCache,
+    tsconfigPaths: sharedTsconfigPathCache,
   };
 }
 
+export function createSharedResolutionCaches(): ResolutionCaches {
+  return createResolutionCaches(sharedTsconfigCache, sharedTsconfigPathCache);
+}
+
 export function setTypeScriptModuleLoaderForTests(loader: (() => TypeScriptModule | null) | null): void {
+  sharedTsconfigCache.clear();
+  sharedTsconfigPathCache.clear();
+
   loadTypeScriptModule =
     loader ??
     (() => {
@@ -70,6 +82,7 @@ export function getTsconfigPath(
   options: Options[0] | undefined,
   importerFilename: string,
   cwd: string = process.cwd(),
+  tsconfigPathCache: Map<string, string | null> = new Map<string, string | null>(),
 ): string | null {
   const typescript = getTypeScriptModule();
 
@@ -85,7 +98,18 @@ export function getTsconfigPath(
     return path.isAbsolute(options.tsconfig) ? options.tsconfig : path.resolve(cwd, options.tsconfig);
   }
 
-  return typescript.findConfigFile(path.dirname(importerFilename), typescript.sys.fileExists, 'tsconfig.json') ?? null;
+  const importerDirectory = path.dirname(importerFilename);
+  const cacheKey = `${getOptionsCacheKey(options, cwd)}\0${importerDirectory}`;
+  const cachedPath = tsconfigPathCache.get(cacheKey);
+
+  if (cachedPath !== undefined) {
+    return cachedPath;
+  }
+
+  const tsconfigPath = typescript.findConfigFile(importerDirectory, typescript.sys.fileExists, 'tsconfig.json') ?? null;
+  tsconfigPathCache.set(cacheKey, tsconfigPath);
+
+  return tsconfigPath;
 }
 
 export function getTsconfigInfo(
@@ -93,6 +117,7 @@ export function getTsconfigInfo(
   importerFilename: string,
   tsconfigCache: Map<string, TsconfigInfo | null>,
   cwd: string = process.cwd(),
+  tsconfigPathCache: Map<string, string | null> = new Map<string, string | null>(),
 ): TsconfigInfo | null {
   const typescript = getTypeScriptModule();
 
@@ -100,7 +125,7 @@ export function getTsconfigInfo(
     return null;
   }
 
-  const tsconfigPath = getTsconfigPath(options, importerFilename, cwd);
+  const tsconfigPath = getTsconfigPath(options, importerFilename, cwd, tsconfigPathCache);
 
   if (!tsconfigPath) {
     return null;
@@ -123,6 +148,11 @@ export function getTsconfigInfo(
       tsconfigCache.set(tsconfigPath, {
         compilerOptions: parsedConfig.options,
         configFilePath: tsconfigPath,
+        moduleResolutionCache: typescript.createModuleResolutionCache(
+          path.dirname(tsconfigPath),
+          typescript.sys.useCaseSensitiveFileNames ? fileName => fileName : fileName => fileName.toLowerCase(),
+          parsedConfig.options,
+        ),
       });
     }
   }
@@ -186,6 +216,7 @@ export function resolveWithTsconfig(
   specifier: string,
   tsconfigCache: Map<string, TsconfigInfo | null>,
   cwd: string = process.cwd(),
+  tsconfigPathCache: Map<string, string | null> = new Map<string, string | null>(),
 ): string | null {
   const typescript = getTypeScriptModule();
 
@@ -193,7 +224,7 @@ export function resolveWithTsconfig(
     return null;
   }
 
-  const tsconfigInfo = getTsconfigInfo(options, importerFilename, tsconfigCache, cwd);
+  const tsconfigInfo = getTsconfigInfo(options, importerFilename, tsconfigCache, cwd, tsconfigPathCache);
 
   if (!tsconfigInfo) {
     return null;
@@ -204,6 +235,7 @@ export function resolveWithTsconfig(
     importerFilename,
     tsconfigInfo.compilerOptions,
     typescript.sys,
+    tsconfigInfo.moduleResolutionCache,
   ).resolvedModule;
 
   if (!resolvedModule || resolvedModule.isExternalLibraryImport) {
@@ -230,7 +262,14 @@ export function resolveImport(
   const resolvedFilePath = isRelativePath(specifier)
     ? resolveModuleFile(importerFilename, specifier)
     : (resolveWithManualPaths(options, importerFilename, specifier, cwd) ??
-      resolveWithTsconfig(options, importerFilename, specifier, resolutionCaches.tsconfigInfo, cwd));
+      resolveWithTsconfig(
+        options,
+        importerFilename,
+        specifier,
+        resolutionCaches.tsconfigInfo,
+        cwd,
+        resolutionCaches.tsconfigPaths,
+      ));
 
   resolutionCaches.importResolutions.set(cacheKey, resolvedFilePath);
 
@@ -280,8 +319,9 @@ export function reverseResolveTsconfigAlias(
   resolvedFilePath: string,
   tsconfigCache: Map<string, TsconfigInfo | null>,
   cwd: string = process.cwd(),
+  tsconfigPathCache: Map<string, string | null> = new Map<string, string | null>(),
 ): string | null {
-  const tsconfigInfo = getTsconfigInfo(options, importerFilename, tsconfigCache, cwd);
+  const tsconfigInfo = getTsconfigInfo(options, importerFilename, tsconfigCache, cwd, tsconfigPathCache);
 
   if (!tsconfigInfo) {
     return null;
@@ -342,6 +382,7 @@ export function getPreferredSourceSpecifier(
   reExportTarget: ReExportTarget,
   tsconfigCache: Map<string, TsconfigInfo | null>,
   cwd: string = process.cwd(),
+  tsconfigPathCache: Map<string, string | null> = new Map<string, string | null>(),
 ): string | null {
   const fixStyle = options?.fixStyle ?? 'auto';
 
@@ -355,7 +396,14 @@ export function getPreferredSourceSpecifier(
 
   const aliasCandidates = [
     reverseResolveManualAlias(options, reExportTarget.resolvedFilePath, cwd),
-    reverseResolveTsconfigAlias(options, importerFilename, reExportTarget.resolvedFilePath, tsconfigCache, cwd),
+    reverseResolveTsconfigAlias(
+      options,
+      importerFilename,
+      reExportTarget.resolvedFilePath,
+      tsconfigCache,
+      cwd,
+      tsconfigPathCache,
+    ),
   ].filter((value): value is string => value !== null);
   const uniqueAliasCandidates = Array.from(new Set(aliasCandidates));
 

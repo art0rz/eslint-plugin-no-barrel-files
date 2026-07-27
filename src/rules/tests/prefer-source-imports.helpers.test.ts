@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import * as parser from '@typescript-eslint/parser';
 import { AST_NODE_TYPES } from '@typescript-eslint/utils';
+import * as typescript from 'typescript';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import preferSourceImports, { __private__ } from '../prefer-source-imports';
 
@@ -111,6 +112,40 @@ describe('prefer-source-imports private helpers', () => {
     expect(__private__.shouldReportMissingTypeScript('/repo/src/file.tsx', {})).toBe(false);
     expect(__private__.getTsconfigPath({ tsconfig: false }, '/repo/src/file.ts')).toBeNull();
     expect(__private__.getTsconfigPath({}, '/repo/src/file.ts')).toBeNull();
+  });
+
+  it('shares TypeScript configuration caches across rule instances', () => {
+    const tempDir = makeTempDir();
+    const importer = path.join(tempDir, 'consumer.ts');
+
+    writeFiles(tempDir, {
+      'consumer.ts': "import { Foo } from '@app/foo';",
+      'src/foo.ts': 'export const Foo = 1;',
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          baseUrl: '.',
+          paths: {
+            '@app/*': ['src/*'],
+          },
+        },
+      }),
+    });
+
+    const findConfigFile = vi.fn(typescript.findConfigFile);
+    __private__.setTypeScriptModuleLoaderForTests(() => ({ ...typescript, findConfigFile }) as any);
+
+    const firstCaches = __private__.createSharedResolutionCaches();
+    const secondCaches = __private__.createSharedResolutionCaches();
+
+    expect(__private__.resolveImport({}, firstCaches, importer, '@app/foo', tempDir)).toBe(
+      path.join(tempDir, 'src/foo.ts'),
+    );
+    expect(__private__.resolveImport({}, secondCaches, importer, '@app/foo', tempDir)).toBe(
+      path.join(tempDir, 'src/foo.ts'),
+    );
+    expect(firstCaches.tsconfigInfo).toBe(secondCaches.tsconfigInfo);
+    expect(firstCaches.tsconfigPaths).toBe(secondCaches.tsconfigPaths);
+    expect(findConfigFile).toHaveBeenCalledTimes(1);
   });
 
   it('covers parseModule read and parse failures', () => {
