@@ -47,6 +47,24 @@ jobs:
       - run: npm ci --include=dev
       - run: npm run test:coverage
 
+  typescript-compatibility:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        typescript-version: ['5.6.3', '6.0.3']
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --include=dev
+      - run: npm install --no-save --package-lock=false typescript@${{ matrix.typescript-version }}
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test -- --run
+
   consumer-smoke:
     runs-on: ubuntu-latest
     strategy:
