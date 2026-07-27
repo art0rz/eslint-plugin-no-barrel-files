@@ -662,6 +662,17 @@ describe('prefer-source-imports private helpers', () => {
         null,
         2,
       ),
+      'tsconfig-paths-without-base-url.json': JSON.stringify(
+        {
+          compilerOptions: {
+            paths: {
+              '@config/*': ['src/*'],
+            },
+          },
+        },
+        null,
+        2,
+      ),
       'tsconfig-duplicate.json': JSON.stringify(
         {
           compilerOptions: {
@@ -784,6 +795,36 @@ describe('prefer-source-imports private helpers', () => {
         tempDir,
       ),
     ).toBe('@base/foo');
+    expect(
+      __private__.reverseResolveTsconfigAlias(
+        { tsconfig: path.join(tempDir, 'tsconfig-paths-without-base-url.json') },
+        importer,
+        path.join(tempDir, 'src/foo.ts'),
+        new Map(),
+        tempDir,
+      ),
+    ).toBe('@config/foo');
+    const relativeBaseUrlConfigPath = path.join(tempDir, 'tsconfig-relative-base-url.json');
+    expect(
+      __private__.reverseResolveTsconfigAlias(
+        { tsconfig: relativeBaseUrlConfigPath },
+        importer,
+        path.join(tempDir, 'packages/app/src/foo.ts'),
+        new Map([
+          [
+            relativeBaseUrlConfigPath,
+            {
+              compilerOptions: {
+                baseUrl: 'packages/app',
+                paths: { '@relative/*': ['src/*'] },
+              },
+              configFilePath: relativeBaseUrlConfigPath,
+            },
+          ],
+        ]),
+        tempDir,
+      ),
+    ).toBe('@relative/foo');
     expect(
       __private__.reverseResolveTsconfigAlias(
         { tsconfig: path.join(tempDir, 'tsconfig-no-paths.json') },
