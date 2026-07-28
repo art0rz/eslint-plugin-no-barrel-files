@@ -12,6 +12,21 @@
 
 * support ESLint 10 ([71dba90](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/71dba909c52504f2aa17497db5714624121486b2))
 
+## [2.2.0](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/eslint-plugin-no-barrel-files-v2.1.1...eslint-plugin-no-barrel-files-v2.2.0) (2026-07-28)
+
+
+### Features
+
+* allow intentional barrel files ([7adda7a](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/7adda7ae03dd3eebe2c15028ff53ca56d7a00e27))
+* ignore intentional barrel imports ([e69920a](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/e69920a0b0396077283c2f8e29cb4c2b46ccabc1))
+* rewrite direct default barrel imports ([9618ad3](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/9618ad3e4d9a5b62faf173b41e1100fc3fbb8967))
+
+
+### Bug Fixes
+
+* regenerate npm lockfile ([369de08](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/369de08638c4642c22d4389da393d938047815b1))
+* support npm 10 lockfile installs ([423e61f](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/423e61f69ee3d37789204a71e62d20879ee5d736))
+
 ## [2.1.1](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/eslint-plugin-no-barrel-files-v2.1.0...eslint-plugin-no-barrel-files-v2.1.1) (2026-07-27)
 
 
