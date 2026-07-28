@@ -182,9 +182,20 @@ Controls how the replacement import path is generated.
 Skips imports whose source specifier matches one of the supplied glob patterns. Use this for intentional public barrel APIs while continuing to fix internal barrel imports.
 
 ```js
-{
-  ignore: ['@acme/ui', '@acme/*/public'],
-}
+import noBarrelFiles from 'eslint-plugin-no-barrel-files';
+
+export default [
+  {
+    plugins: {
+      'no-barrel-files': noBarrelFiles,
+    },
+    rules: {
+      'no-barrel-files/prefer-source-imports': ['error', {
+        ignore: ['@acme/ui', '@acme/*/public'],
+      }],
+    },
+  },
+];
 ```
 
 ### `tsconfig`
