@@ -29,7 +29,7 @@ References:
 npm install --save-dev eslint-plugin-no-barrel-files
 ```
 
-If you plan to use `prefer-source-imports` with TypeScript files or tsconfig-based path resolution, also install `typescript` in the consuming project. The rule uses your project's TypeScript resolver so it can follow `tsconfig.json`, `baseUrl`, and `paths` consistently with the codebase being linted.
+`prefer-source-imports` needs `typescript` in the consuming project whenever tsconfig resolution is enabled (the default), including when linting JavaScript files. Set `tsconfig: false` to use only relative imports and the rule's manual `paths` option instead.
 
 ```sh
 npm install --save-dev typescript
@@ -133,6 +133,7 @@ This rule is useful when:
 - explicit alias mappings through the `paths` rule option
 - explicit re-exports such as `export { Foo } from "./foo"`
 - aliased re-exports such as `export { Bar as Foo } from "./bar"`
+- local re-exports such as `import { Foo } from "./foo"; export { Foo }`
 - default re-exports such as `export { default as Foo } from "./foo"`
 - `export * from "./foo"` when the exported name can be resolved back to the source file
 - type-only re-exports such as `export type { Foo } ...` and `export { type Foo } ...`
@@ -285,6 +286,7 @@ Typical rollout options:
 
 - `prefer-source-imports` depends on being able to resolve the barrel and the underlying source module.
 - `prefer-source-imports` uses the consuming project's `typescript` installation for tsconfig parsing and module resolution.
+- The current TypeScript peer-dependency range is `^5.6.3 || ^6.0.0`. TypeScript 7 is not supported yet.
 - If `prefer-source-imports` runs on a TypeScript file without `typescript` installed and tsconfig resolution is enabled, the rule reports a configuration error instead of crashing the plugin.
 - The same configuration error is reported for JavaScript files when the rule needs tsconfig-based resolution but `typescript` is not installed.
 - Alias preservation only happens when reverse alias lookup is unique.
