@@ -50,6 +50,7 @@ import {
   MessageIds,
   NamedImportSpecifier,
   Options,
+  SupportedImportSpecifier,
 } from './prefer-source-imports/types';
 
 function isNamedImportSpecifier(specifier: TSESTree.ImportClause): specifier is NamedImportSpecifier {
@@ -58,6 +59,10 @@ function isNamedImportSpecifier(specifier: TSESTree.ImportClause): specifier is 
     specifier.imported.type === AST_NODE_TYPES.Identifier &&
     specifier.local.type === AST_NODE_TYPES.Identifier
   );
+}
+
+function isSupportedImportSpecifier(specifier: TSESTree.ImportClause): specifier is SupportedImportSpecifier {
+  return specifier.type === AST_NODE_TYPES.ImportDefaultSpecifier || isNamedImportSpecifier(specifier);
 }
 
 function shouldReportMissingTypeScript(_filename: string, options: Options[0] | undefined): boolean {
@@ -140,9 +145,9 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
           return;
         }
 
-        const namedSpecifiers = node.specifiers.filter(isNamedImportSpecifier);
+        const supportedSpecifiers = node.specifiers.filter(isSupportedImportSpecifier);
 
-        if (namedSpecifiers.length === 0) {
+        if (supportedSpecifiers.length === 0) {
           return;
         }
 
@@ -168,9 +173,12 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
 
         const matchedSpecifiers: Array<MatchedSpecifier> = [];
 
-        namedSpecifiers.forEach(specifier => {
-          const specifierIsTypeOnly = isTypeOnlyImport(node, specifier);
-          const reExportKey = getReExportKey(specifier.imported.name, specifierIsTypeOnly);
+        supportedSpecifiers.forEach(specifier => {
+          const specifierIsTypeOnly =
+            specifier.type === AST_NODE_TYPES.ImportSpecifier ? isTypeOnlyImport(node, specifier) : false;
+          const importedName =
+            specifier.type === AST_NODE_TYPES.ImportDefaultSpecifier ? 'default' : specifier.imported.name;
+          const reExportKey = getReExportKey(importedName, specifierIsTypeOnly);
           const explicitReExport = barrelAnalysis.explicitReExports.get(reExportKey);
 
           if (explicitReExport) {
@@ -218,7 +226,7 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
         const canAutoFix =
           matchedSpecifiers.every(({ preferredSourceSpecifier }) => preferredSourceSpecifier !== null) &&
           matchedSpecifiers.length === node.specifiers.length &&
-          node.specifiers.every(specifier => specifier.type === AST_NODE_TYPES.ImportSpecifier);
+          node.specifiers.every(isSupportedImportSpecifier);
         const autofix = canAutoFix ? buildAutofix(sourceCode, node, matchedSpecifiers) : null;
 
         if (autofix) {
@@ -280,6 +288,7 @@ export const __private__ = {
   getTsconfigInfo,
   getTsconfigPath,
   isNamedImportSpecifier,
+  isSupportedImportSpecifier,
   isRelativePath,
   isTypeOnlyImport,
   matchesAliasPattern,

@@ -155,7 +155,7 @@ This rule is useful when:
 Current scope:
 
 - the rule focuses on named imports
-- default imports from a barrel are not rewritten
+- default imports are rewritten when the barrel directly re-exports its default export
 - namespace imports are not the target of this rule
 
 #### Safe autofix behavior
