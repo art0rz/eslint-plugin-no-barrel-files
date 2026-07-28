@@ -6,6 +6,7 @@ export type MessageIds = 'missingTypeScript' | 'preferSourceImport' | 'preferSou
 export type Options = [
   {
     fixStyle?: 'auto' | 'preserve-alias' | 'relative';
+    ignore?: string[];
     paths?: Record<string, string | string[]>;
     tsconfig?: boolean | string;
   }?,

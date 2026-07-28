@@ -43,6 +43,11 @@ ruleTester.run('prefer-source-imports', preferSourceImports, {
       code: `import { LocalNamespace } from './local-barrel-namespace';`,
       filename: path.join(fixtureDirectory, 'consumer.ts'),
     },
+    {
+      code: `import { Foo } from '@app/barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      options: [{ ignore: ['@app/*'] }],
+    },
   ],
   invalid: [
     {

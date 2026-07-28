@@ -1,4 +1,5 @@
 import { AST_NODE_TYPES, TSESLint, TSESTree } from '@typescript-eslint/utils';
+import { minimatch } from 'minimatch';
 import {
   createAnalysisCaches,
   collectAllExportedBindings,
@@ -90,6 +91,10 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
             type: 'string',
             enum: ['auto', 'preserve-alias', 'relative'],
           },
+          ignore: {
+            type: 'array',
+            items: { type: 'string' },
+          },
           tsconfig: {
             anyOf: [{ type: 'boolean' }, { type: 'string' }],
           },
@@ -142,6 +147,10 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
         }
 
         if (!node.source.value || typeof node.source.value !== 'string' || node.specifiers.length === 0) {
+          return;
+        }
+
+        if (options?.ignore?.some(pattern => minimatch(node.source.value, pattern))) {
           return;
         }
 

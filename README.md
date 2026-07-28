@@ -177,6 +177,16 @@ Controls how the replacement import path is generated.
 - `"auto"`
   Preserves aliases for alias-based imports when the reverse alias mapping is unique; otherwise falls back to a relative path.
 
+### `ignore`
+
+Skips imports whose source specifier matches one of the supplied glob patterns. Use this for intentional public barrel APIs while continuing to fix internal barrel imports.
+
+```js
+{
+  ignore: ['@acme/ui', '@acme/*/public'],
+}
+```
+
 ### `tsconfig`
 
 Controls tsconfig-based path resolution.
