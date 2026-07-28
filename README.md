@@ -100,6 +100,20 @@ export const Baz = Moo;
 
 Use this rule when you want to stop new barrel files from being created.
 
+#### Options
+
+##### `allow`
+
+Allows intentional barrel files whose path matches one of the supplied glob patterns. Patterns match paths relative to the current working directory; absolute patterns are also supported.
+
+```js
+{
+  'no-barrel-files/no-barrel-files': ['error', {
+    allow: ['src/index.ts', 'packages/*/src/index.ts'],
+  }],
+}
+```
+
 ### `prefer-source-imports`
 
 Reports imports that go through a barrel when the rule can resolve the original source module.

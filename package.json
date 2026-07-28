@@ -48,7 +48,8 @@
   },
   "dependencies": {
     "@typescript-eslint/parser": "^8.58.1",
-    "@typescript-eslint/utils": "^8.58.1"
+    "@typescript-eslint/utils": "^8.58.1",
+    "minimatch": "^10.2.6"
   },
   "peerDependencies": {
     "eslint": "^8.0.0 || ^9.0.0 || ^10.0.0",

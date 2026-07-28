@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { RuleTester } from '@typescript-eslint/rule-tester';
 import noBarrelFiles from '../no-barrel-files';
 
@@ -9,6 +10,11 @@ ruleTester.run('no-barrel-files', noBarrelFiles, {
       const Foo = () => {};
       export { Foo }
     `,
+    {
+      code: 'export * from "./foo";',
+      filename: path.join(process.cwd(), 'packages/ui/src/index.ts'),
+      options: [{ allow: ['packages/*/src/index.ts'] }],
+    },
     `
       export const Foo = () => {};
     `,
@@ -100,6 +106,12 @@ ruleTester.run('no-barrel-files', noBarrelFiles, {
       export { default } from './Moo';
       `,
       errors: [{ messageId: 'noReExport' }],
+    },
+    {
+      code: 'export * from "./foo";',
+      filename: path.join(process.cwd(), 'packages/ui/src/index.ts'),
+      options: [{ allow: ['packages/*/src/public.ts'] }],
+      errors: [{ messageId: 'noExportAll' }],
     },
   ],
 });
