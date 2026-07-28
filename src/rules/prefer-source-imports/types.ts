@@ -24,9 +24,11 @@ export type NamedImportSpecifier = TSESTree.ImportSpecifier & {
   local: TSESTree.Identifier;
 };
 
+export type SupportedImportSpecifier = NamedImportSpecifier | TSESTree.ImportDefaultSpecifier;
+
 export type MatchedSpecifier = {
   preferredSourceSpecifier: string | null;
-  specifier: NamedImportSpecifier;
+  specifier: SupportedImportSpecifier;
   reExportTarget: ReExportTarget;
 };
 

@@ -16,6 +16,10 @@ ruleTester.run('prefer-source-imports', preferSourceImports, {
       filename: path.join(fixtureDirectory, 'consumer.ts'),
     },
     {
+      code: `import * as Barrel from './barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+    },
+    {
       code: `import { Missing } from './barrel';`,
       filename: path.join(fixtureDirectory, 'consumer.ts'),
     },
@@ -124,6 +128,12 @@ ruleTester.run('prefer-source-imports', preferSourceImports, {
     },
     {
       code: `import { DefaultThing } from './barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import { default as DefaultThing } from './default-thing';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import DefaultThing from './default-barrel';`,
       filename: path.join(fixtureDirectory, 'consumer.ts'),
       output: `import { default as DefaultThing } from './default-thing';`,
       errors: [{ messageId: 'preferSourceImports' }],
