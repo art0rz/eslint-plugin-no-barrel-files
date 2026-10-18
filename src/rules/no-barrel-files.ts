@@ -23,6 +23,7 @@ const noBarrelFiles: TSESLint.RuleModule<MessageIds, Options> = {
   defaultOptions: [{}],
   meta: {
     type: 'suggestion',
+    defaultOptions: [{}],
     docs: {
       url: 'https://github.com/art0rz/eslint-plugin-no-barrel-files',
       description: 'disallow barrel files',
@@ -30,7 +31,13 @@ const noBarrelFiles: TSESLint.RuleModule<MessageIds, Options> = {
     schema: [
       {
         type: 'object',
-        properties: { allow: { type: 'array', items: { type: 'string' } } },
+        properties: {
+          allow: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Glob patterns of files that are allowed to be barrel files.',
+          },
+        },
         additionalProperties: false,
       },
     ],

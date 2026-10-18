@@ -78,6 +78,7 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
   defaultOptions: [{}],
   meta: {
     type: 'suggestion',
+    defaultOptions: [{}],
     fixable: 'code',
     docs: {
       url: 'https://github.com/art0rz/eslint-plugin-no-barrel-files',
@@ -90,16 +91,20 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
           fixStyle: {
             type: 'string',
             enum: ['auto', 'preserve-alias', 'relative'],
+            description: 'How the rewritten import specifier is built.',
           },
           ignore: {
             type: 'array',
             items: { type: 'string' },
+            description: 'Glob patterns of import sources that are never rewritten.',
           },
           tsconfig: {
             anyOf: [{ type: 'boolean' }, { type: 'string' }],
+            description: 'Enable tsconfig path resolution (true/false) or the path to a tsconfig file.',
           },
           paths: {
             type: 'object',
+            description: 'Manual alias mappings used instead of or in addition to tsconfig paths.',
             additionalProperties: {
               anyOf: [
                 { type: 'string' },
