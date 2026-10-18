@@ -7,6 +7,7 @@ import { AST_NODE_TYPES } from '@typescript-eslint/utils';
 import * as typescript from 'typescript';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import preferSourceImports, { __private__ } from '../prefer-source-imports';
+import { getOptionsCacheKey } from '../prefer-source-imports/path-utils';
 
 const originalCwd = process.cwd();
 
@@ -56,6 +57,10 @@ afterEach(() => {
 });
 
 describe('prefer-source-imports private helpers', () => {
+  it('builds a cache key when no options are provided', () => {
+    expect(getOptionsCacheKey(undefined, '/repo')).toBe(JSON.stringify({ cwd: '/repo', options: {} }));
+  });
+
   it('covers the basic string and path helpers', () => {
     expect(__private__.isRelativePath('./foo')).toBe(true);
     expect(__private__.isRelativePath('foo')).toBe(false);
