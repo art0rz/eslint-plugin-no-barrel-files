@@ -224,6 +224,24 @@ ruleTester.run('prefer-source-imports', preferSourceImports, {
       errors: [{ messageId: 'preferSourceImports' }],
     },
     {
+      code: `import { TypeFoo } from './barrel-type-star';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import type { TypeFoo } from './types';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { type TypeFoo } from './barrel-type-star';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import type { TypeFoo } from './types';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { TypeFoo } from './nested-type-star-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import type { TypeFoo } from './types';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
       code: `import { Foo } from './barrel-same-name-value-first';`,
       filename: path.join(fixtureDirectory, 'consumer.ts'),
       output: `import { Foo } from './same-name-value';`,
