@@ -319,6 +319,24 @@ ruleTester.run('prefer-source-imports', preferSourceImports, {
       errors: [{ messageId: 'preferSourceImports' }],
     },
     {
+      code: `import { Foo } from '@app/barrel' with { type: 'x' };`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import { Foo } from '@app/foo' with { type: 'x' };`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { Existing } from '@app/foo';\nimport { Foo } from '@app/barrel' with { type: 'x' };`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import { Existing } from '@app/foo';\nimport { Foo } from '@app/foo' with { type: 'x' };`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { Existing } from '@app/foo' with { type: 'json' };\nimport { Foo } from '@app/barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import { Existing } from '@app/foo' with { type: 'json' };\nimport { Foo } from '@app/foo';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
       code: `import { type TypeFoo } from '@app/barrel';`,
       filename: path.join(fixtureDirectory, 'consumer.ts'),
       output: `import type { TypeFoo } from '@app/types';`,
