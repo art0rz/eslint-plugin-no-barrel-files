@@ -43,9 +43,11 @@ export type MatchedSpecifier = {
   reExportTarget: ReExportTarget;
 };
 
+// `value-or-type` finds a type when no value matches, as for a plain import that names a type.
+export type ReExportKind = 'value' | 'type' | 'value-or-type';
+
 export type BarrelAnalysis = {
-  explicitReExports: Map<string, ReExportTarget>;
-  exportAllReExports: Map<string, ReExportTarget>;
+  lookup(importedName: string, kind: ReExportKind): ReExportTarget | undefined;
 };
 
 export type AnalysisCaches = {
