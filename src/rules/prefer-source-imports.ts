@@ -14,6 +14,7 @@ import {
 } from './prefer-source-imports/analysis';
 import {
   buildAutofix,
+  buildNamespaceAutofix,
   getMergeableImportDeclaration,
   isTypeOnlyImport,
   serializeImportBinding,
@@ -256,7 +257,12 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
           matchedSpecifiers.every(({ preferredSourceSpecifier }) => preferredSourceSpecifier !== null) &&
           matchedSpecifiers.length === node.specifiers.length &&
           node.specifiers.every(isSupportedImportSpecifier);
-        const autofix = canAutoFix ? buildAutofix(sourceCode, node, matchedSpecifiers) : null;
+        const hasNamespaceTarget = matchedSpecifiers.some(({ reExportTarget }) => reExportTarget.isNamespace);
+        const autofix = hasNamespaceTarget
+          ? buildNamespaceAutofix(node, matchedSpecifiers)
+          : canAutoFix
+            ? buildAutofix(sourceCode, node, matchedSpecifiers)
+            : null;
 
         if (autofix) {
           context.report({
@@ -300,6 +306,7 @@ export const __private__ = {
   applyAliasTarget,
   buildAliasSpecifier,
   buildAutofix,
+  buildNamespaceAutofix,
   collectAllExportedBindings,
   collectBarrelAnalysis,
   collectExportedBindings,

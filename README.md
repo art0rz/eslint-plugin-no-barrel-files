@@ -151,12 +151,16 @@ This rule is useful when:
 - default re-exports such as `export { default as Foo } from "./foo"`
 - `export * from "./foo"` when the exported name can be resolved back to the source file
 - type-only re-exports such as `export type { Foo } ...` and `export { type Foo } ...`
+- types imported without the `type` modifier, including through `export *`
+- default re-exports of an imported binding such as `import Foo from "./foo"; export default Foo`
+- namespace re-exports such as `export * as ns from "./foo"` and `import * as ns from "./foo"; export { ns }`
 
 Current scope:
 
 - the rule focuses on named imports
 - default imports are rewritten when the barrel directly re-exports its default export
-- namespace imports are not the target of this rule
+- namespace imports (`import * as ns from './barrel'`) are not the target of this rule
+- namespace re-exports are only autofixed when the import declaration contains that single specifier
 
 #### Safe autofix behavior
 

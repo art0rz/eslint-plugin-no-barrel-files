@@ -51,6 +51,23 @@ export function getMergeableImportDeclaration(
   return node;
 }
 
+export function buildNamespaceAutofix(
+  currentNode: TSESTree.ImportDeclaration,
+  matchedSpecifiers: MatchedSpecifier[],
+): TSESLint.ReportFixFunction | null {
+  const [match] = matchedSpecifiers;
+
+  if (matchedSpecifiers.length !== 1 || currentNode.specifiers.length !== 1 || !match!.preferredSourceSpecifier) {
+    return null;
+  }
+
+  const quote = currentNode.source.raw?.startsWith("'") ? "'" : '"';
+  const typeKeyword = match!.reExportTarget.isTypeOnly ? ' type' : '';
+  const replacement = `import${typeKeyword} * as ${match!.specifier.local.name} from ${quote}${match!.preferredSourceSpecifier}${quote};`;
+
+  return fixer => fixer.replaceText(currentNode, replacement);
+}
+
 export function buildAutofix(
   sourceCode: TSESLint.SourceCode,
   currentNode: TSESTree.ImportDeclaration,
