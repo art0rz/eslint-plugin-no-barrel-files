@@ -48,6 +48,22 @@ ruleTester.run('prefer-source-imports', preferSourceImports, {
       filename: path.join(fixtureDirectory, 'consumer.ts'),
       options: [{ ignore: ['@app/*'] }],
     },
+    {
+      code: `import { Foo } from './barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      options: [{ ignore: ['./barrel'] }],
+    },
+    {
+      code: `import { Foo } from '@acme/ui/public';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      options: [
+        {
+          ignore: ['@acme/ui', '@acme/*/public'],
+          tsconfig: false,
+          paths: { '@acme/ui/public': 'src/rules/tests/fixtures/prefer-source-imports/barrel' },
+        },
+      ],
+    },
   ],
   invalid: [
     {
@@ -406,6 +422,44 @@ ruleTester.run('prefer-source-imports', preferSourceImports, {
       code: `import { Existing } from '@app/foo';\nimport { Foo } from '@app/barrel';`,
       filename: path.join(fixtureDirectory, 'consumer.ts'),
       output: `import { Existing, Foo } from '@app/foo';\n`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { Foo } from '@app/barrel' with { type: 'x' };`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import { Foo } from '@app/foo' with { type: 'x' };`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { Existing } from '@app/foo';\nimport { Foo } from '@app/barrel' with { type: 'x' };`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import { Existing } from '@app/foo';\nimport { Foo } from '@app/foo' with { type: 'x' };`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { Existing } from '@app/foo' with { type: 'json' };\nimport { Foo } from '@app/barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import { Existing } from '@app/foo' with { type: 'json' };\nimport { Foo } from '@app/foo';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { Foo } from '@acme/ui/public';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      options: [
+        {
+          ignore: ['@acme/ui'],
+          tsconfig: false,
+          paths: { '@acme/ui/public': 'src/rules/tests/fixtures/prefer-source-imports/barrel' },
+        },
+      ],
+      output: `import { Foo } from './foo';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { Foo } from '@app/barrel';`,
+      filename: path.join(process.cwd(), 'src/consumer.ts'),
+      options: [{ tsconfig: './src/rules/tests/fixtures/prefer-source-imports/tsconfig.json' }],
+      output: `import { Foo } from '@app/foo';`,
       errors: [{ messageId: 'preferSourceImports' }],
     },
     {

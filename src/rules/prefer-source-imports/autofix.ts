@@ -8,6 +8,10 @@ export function isTypeOnlyImport(
   return declaration.importKind === 'type' || specifier?.importKind === 'type';
 }
 
+function hasImportAttributes(node: TSESTree.ImportDeclaration): boolean {
+  return (node.attributes?.length ?? 0) > 0;
+}
+
 export function serializeImportBinding(importedName: string, localName: string, isTypeOnly: boolean): string {
   if (importedName === 'default') {
     return `${isTypeOnly ? 'type ' : ''}default as ${localName}`;
@@ -33,7 +37,7 @@ export function getMergeableImportDeclaration(
   node: TSESTree.ImportDeclaration,
   sourceSpecifier: string,
 ): TSESTree.ImportDeclaration | null {
-  if (node.source.value !== sourceSpecifier) {
+  if (node.source.value !== sourceSpecifier || hasImportAttributes(node)) {
     return null;
   }
 
@@ -91,7 +95,8 @@ export function buildAutofix(
 
   const mergeTargets = new Map<string, TSESTree.ImportDeclaration>();
 
-  for (const sourceSpecifier of groupedImports.keys()) {
+  // Attributes apply to every binding in the declaration, so merging would change how other bindings load.
+  for (const sourceSpecifier of hasImportAttributes(currentNode) ? [] : groupedImports.keys()) {
     const matchingDeclarations = sourceCode.ast.body.filter(
       statement =>
         statement.type === AST_NODE_TYPES.ImportDeclaration &&
@@ -180,12 +185,15 @@ export function buildAutofix(
     }
 
     const quote = currentNode.source.raw?.startsWith("'") ? "'" : '"';
+    const attributes = hasImportAttributes(currentNode)
+      ? sourceCode.text.slice(currentNode.source.range[1], currentNode.range[1]).replace(/;\s*$/, '')
+      : '';
     const replacement = Array.from(groupedImports.entries())
       .map(([sourceSpecifier, bindings]) => {
         const allTypeOnly = bindings.every(binding => binding.isTypeOnly);
         const serializedBindings = serializeImportBindings(bindings, allTypeOnly);
 
-        return `import${allTypeOnly ? ' type' : ''} { ${serializedBindings} } from ${quote}${sourceSpecifier}${quote};`;
+        return `import${allTypeOnly ? ' type' : ''} { ${serializedBindings} } from ${quote}${sourceSpecifier}${quote}${attributes};`;
       })
       .join('\n');
 

@@ -15,6 +15,11 @@ ruleTester.run('no-barrel-files', noBarrelFiles, {
       filename: path.join(process.cwd(), 'packages/ui/src/index.ts'),
       options: [{ allow: ['packages/*/src/index.ts'] }],
     },
+    {
+      code: 'export * from "./foo";',
+      filename: path.join(process.cwd(), 'packages/ui/src/index.ts'),
+      options: [{ allow: [path.join(process.cwd(), 'packages/*/src/index.ts').split(path.sep).join('/')] }],
+    },
     `
       export const Foo = () => {};
     `,
@@ -34,6 +39,12 @@ ruleTester.run('no-barrel-files', noBarrelFiles, {
   invalid: [
     {
       code: 'export * from "./foo"',
+      errors: [{ messageId: 'noExportAll' }],
+    },
+    {
+      code: 'export * from "./foo";',
+      filename: path.join(process.cwd(), 'packages/ui/src/index.ts'),
+      options: [{ allow: [path.join(process.cwd(), 'packages/other/src/index.ts').split(path.sep).join('/')] }],
       errors: [{ messageId: 'noExportAll' }],
     },
     {
