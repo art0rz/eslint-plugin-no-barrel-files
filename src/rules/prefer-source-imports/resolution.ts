@@ -3,13 +3,15 @@ import path from 'node:path';
 import {
   AnalysisCaches,
   BarrelAnalysis,
+  ImportResolver,
+  ImportResolverCaches,
   ManualAliasMapping,
   Options,
   ReExportTarget,
   ResolutionCaches,
   TsconfigInfo,
 } from './types';
-import { parseBarrelFile } from './analysis';
+import { createAnalysisCaches, parseBarrelFile } from './analysis';
 import {
   applyAliasTarget,
   buildAliasSpecifier,
@@ -37,6 +39,7 @@ let loadTypeScriptModule: () => TypeScriptModule | null = () => {
 const sharedTsconfigCache = new Map<string, TsconfigInfo | null>();
 const sharedTsconfigPathCache = new Map<string, string | null>();
 const sharedBarrelAnalysisCache = new Map<string, BarrelAnalysis | null>();
+const sharedAnalysisCaches = createAnalysisCaches();
 
 export function createResolutionCaches(
   sharedTsconfigCache: Map<string, TsconfigInfo | null> = new Map<string, TsconfigInfo | null>(),
@@ -456,33 +459,49 @@ export function getPreferredSourceSpecifier(
   return toRelativeImportSpecifier(importerFilename, reExportTarget.resolvedFilePath);
 }
 
-export function getBarrelAnalysis(
+function getBarrelAnalysis(
   options: Options[0] | undefined,
   barrelFilePath: string,
-  barrelExportCache: Map<string, BarrelAnalysis | null>,
   resolutionCaches: ResolutionCaches,
   analysisCaches: AnalysisCaches,
-  cwd: string = process.cwd(),
+  cwd: string,
 ): BarrelAnalysis | null {
   const cacheKey = `${getOptionsCacheKey(options, cwd)}\0${barrelFilePath}`;
-  const cachedAnalysis = barrelExportCache.get(cacheKey);
-
-  if (cachedAnalysis !== undefined) {
-    return cachedAnalysis;
-  }
-
-  let barrelAnalysis = resolutionCaches.barrelAnalyses.get(cacheKey);
 
   if (!resolutionCaches.barrelAnalyses.has(cacheKey)) {
-    barrelAnalysis = parseBarrelFile(
-      barrelFilePath,
-      (importerFilename, specifier) => resolveImport(options, resolutionCaches, importerFilename, specifier, cwd),
-      analysisCaches,
+    resolutionCaches.barrelAnalyses.set(
+      cacheKey,
+      parseBarrelFile(
+        barrelFilePath,
+        (importerFilename, specifier) => resolveImport(options, resolutionCaches, importerFilename, specifier, cwd),
+        analysisCaches,
+      ),
     );
-    resolutionCaches.barrelAnalyses.set(cacheKey, barrelAnalysis);
   }
 
-  barrelExportCache.set(cacheKey, barrelAnalysis ?? null);
+  return resolutionCaches.barrelAnalyses.get(cacheKey) ?? null;
+}
 
-  return barrelAnalysis ?? null;
+// Parsed barrel modules are immutable for this rule's fixes, so rule instances share caches by default.
+export function createImportResolver(
+  options: Options[0] | undefined,
+  cwd: string,
+  caches: ImportResolverCaches = { resolution: createSharedResolutionCaches(), analysis: sharedAnalysisCaches },
+): ImportResolver {
+  return {
+    resolveImport: (importerFilename, specifier) =>
+      resolveImport(options, caches.resolution, importerFilename, specifier, cwd),
+    getBarrelAnalysis: barrelFilePath =>
+      getBarrelAnalysis(options, barrelFilePath, caches.resolution, caches.analysis, cwd),
+    getPreferredSourceSpecifier: (importerFilename, originalImportSpecifier, reExportTarget) =>
+      getPreferredSourceSpecifier(
+        options,
+        importerFilename,
+        originalImportSpecifier,
+        reExportTarget,
+        caches.resolution.tsconfigInfo,
+        cwd,
+        caches.resolution.tsconfigPaths,
+      ),
+  };
 }

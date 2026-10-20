@@ -68,6 +68,21 @@ export type ResolutionCaches = {
   tsconfigPaths: Map<string, string | null>;
 };
 
+export type ImportResolverCaches = {
+  analysis: AnalysisCaches;
+  resolution: ResolutionCaches;
+};
+
+export type ImportResolver = {
+  getBarrelAnalysis(barrelFilePath: string): BarrelAnalysis | null;
+  getPreferredSourceSpecifier(
+    importerFilename: string,
+    originalImportSpecifier: string,
+    reExportTarget: ReExportTarget,
+  ): string | null;
+  resolveImport(importerFilename: string, specifier: string): string | null;
+};
+
 export type ManualAliasMapping = {
   pattern: string;
   target: string;
