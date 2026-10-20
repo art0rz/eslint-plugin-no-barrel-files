@@ -1185,37 +1185,21 @@ describe('prefer-source-imports private helpers', () => {
       ),
     ).toBeNull();
 
-    const barrelExportCache = new Map<string, any>();
     const barrelFilePath = path.join(tempDir, 'src/barrel.ts');
-    const resolutionCaches = __private__.createResolutionCaches(new Map());
-    const analysisCaches = __private__.createAnalysisCaches();
-    const first = __private__.getBarrelAnalysis(
-      {},
-      barrelFilePath,
-      barrelExportCache,
-      resolutionCaches,
-      analysisCaches,
-      tempDir,
-    );
-    const second = __private__.getBarrelAnalysis(
-      {},
-      barrelFilePath,
-      barrelExportCache,
-      resolutionCaches,
-      analysisCaches,
-      tempDir,
-    );
+    const caches = {
+      analysis: __private__.createAnalysisCaches(),
+      resolution: __private__.createResolutionCaches(new Map()),
+    };
+    const first = __private__.createImportResolver({}, tempDir, caches).getBarrelAnalysis(barrelFilePath);
+    const second = __private__.createImportResolver({}, tempDir, caches).getBarrelAnalysis(barrelFilePath);
     expect(first).toBe(second);
 
-    const anotherBarrelExportCache = new Map<string, any>();
-    const reusedFromResolutionCache = __private__.getBarrelAnalysis(
-      {},
-      barrelFilePath,
-      anotherBarrelExportCache,
-      resolutionCaches,
-      __private__.createAnalysisCaches(),
-      tempDir,
-    );
+    const reusedFromResolutionCache = __private__
+      .createImportResolver({}, tempDir, {
+        analysis: __private__.createAnalysisCaches(),
+        resolution: caches.resolution,
+      })
+      .getBarrelAnalysis(barrelFilePath);
     expect(reusedFromResolutionCache).toBe(first);
   });
 

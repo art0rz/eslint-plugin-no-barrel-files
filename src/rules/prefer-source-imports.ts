@@ -28,9 +28,9 @@ import {
   toRelativeImportSpecifier,
 } from './prefer-source-imports/path-utils';
 import {
+  createImportResolver,
   createResolutionCaches,
   createSharedResolutionCaches,
-  getBarrelAnalysis,
   getManualAliasMappings,
   getPreferredSourceSpecifier,
   getTypeScriptModule,
@@ -45,7 +45,6 @@ import {
   setTypeScriptModuleLoaderForTests,
 } from './prefer-source-imports/resolution';
 import {
-  BarrelAnalysis,
   MatchedSpecifier,
   MessageIds,
   NamedImportSpecifier,
@@ -68,10 +67,6 @@ function isSupportedImportSpecifier(specifier: TSESTree.ImportClause): specifier
 function shouldReportMissingTypeScript(_filename: string, options: Options[0] | undefined): boolean {
   return options?.tsconfig !== false && !hasTypeScriptModule();
 }
-
-// ESLint creates a rule instance for every file. Parsed barrel modules are
-// immutable for this rule's fixes, so share them across those instances.
-const sharedAnalysisCaches = createAnalysisCaches();
 
 const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
   defaultOptions: [{}],
@@ -128,10 +123,7 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
   create(context) {
     const [options] = context.options;
     const sourceCode = context.sourceCode;
-    const barrelExportCache = new Map<string, BarrelAnalysis | null>();
-    const analysisCaches = sharedAnalysisCaches;
-    const resolutionCaches = createSharedResolutionCaches();
-    const cwd = process.cwd();
+    const resolver = createImportResolver(options, process.cwd());
     const missingTypeScript = shouldReportMissingTypeScript(context.filename, options);
 
     return {
@@ -165,20 +157,13 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
         }
 
         const importerFilename = context.filename;
-        const barrelFilePath = resolveImport(options, resolutionCaches, importerFilename, node.source.value, cwd);
+        const barrelFilePath = resolver.resolveImport(importerFilename, node.source.value);
 
         if (!barrelFilePath) {
           return;
         }
 
-        const barrelAnalysis = getBarrelAnalysis(
-          options,
-          barrelFilePath,
-          barrelExportCache,
-          resolutionCaches,
-          analysisCaches,
-          cwd,
-        );
+        const barrelAnalysis = resolver.getBarrelAnalysis(barrelFilePath);
 
         if (!barrelAnalysis) {
           return;
@@ -199,14 +184,10 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
           }
 
           matchedSpecifiers.push({
-            preferredSourceSpecifier: getPreferredSourceSpecifier(
-              options,
+            preferredSourceSpecifier: resolver.getPreferredSourceSpecifier(
               importerFilename,
               node.source.value,
               reExportTarget,
-              resolutionCaches.tsconfigInfo,
-              cwd,
-              resolutionCaches.tsconfigPaths,
             ),
             specifier,
             reExportTarget,
@@ -241,23 +222,14 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
           return;
         }
 
-        matchedSpecifiers.forEach(({ specifier, reExportTarget }) => {
+        matchedSpecifiers.forEach(({ preferredSourceSpecifier, specifier, reExportTarget }) => {
           context.report({
             node: specifier,
             messageId: 'preferSourceImport',
             data: {
               barrel: node.source.value,
               name: specifier.local.name,
-              source:
-                getPreferredSourceSpecifier(
-                  options,
-                  importerFilename,
-                  node.source.value,
-                  reExportTarget,
-                  resolutionCaches.tsconfigInfo,
-                  cwd,
-                  resolutionCaches.tsconfigPaths,
-                ) ?? reExportTarget.sourceSpecifier,
+              source: preferredSourceSpecifier ?? reExportTarget.sourceSpecifier,
             },
           });
         });
@@ -275,9 +247,9 @@ export const __private__ = {
   collectBarrelAnalysis,
   collectExportedBindings,
   createAnalysisCaches,
+  createImportResolver,
   createResolutionCaches,
   createSharedResolutionCaches,
-  getBarrelAnalysis,
   getManualAliasMappings,
   getTypeScriptModule,
   hasTypeScriptModule,
