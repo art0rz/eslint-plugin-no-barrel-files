@@ -12,6 +12,20 @@
 
 * support ESLint 10 ([71dba90](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/71dba909c52504f2aa17497db5714624121486b2))
 
+## [2.3.0](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/eslint-plugin-no-barrel-files-v2.2.0...eslint-plugin-no-barrel-files-v2.3.0) (2026-10-20)
+
+
+### Features
+
+* resolve default and namespace re-exports ([cae8bf1](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/cae8bf1046184d624ef0bfa2dbca0c6ff11cb3b9))
+
+
+### Bug Fixes
+
+* add meta.defaultOptions and schema descriptions to rules ([9725c06](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/9725c067a52d94ad90e7644700779919e8fd8023))
+* report plain imports of types re-exported via export all ([e63460f](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/e63460f813da40f1e3e5d884827fa964cdb27de6))
+* report type-only imports re-exported without the type modifier ([24d7c0b](https://github.com/art0rz/eslint-plugin-no-barrel-files/commit/24d7c0be5eb5a584805c4f1f8e8689938b31fd0e))
+
 ## [2.2.0](https://github.com/art0rz/eslint-plugin-no-barrel-files/compare/eslint-plugin-no-barrel-files-v2.1.1...eslint-plugin-no-barrel-files-v2.2.0) (2026-07-28)
 
 
