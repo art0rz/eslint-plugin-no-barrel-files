@@ -464,11 +464,14 @@ export function collectBarrelAnalysis(
         }
 
         const importedBinding = importedBindings.get(specifier.local.name);
-        const specifierIsTypeOnly = statement.exportKind === 'type' || specifier.exportKind === 'type';
 
-        if (!importedBinding || (importedBinding.isTypeOnly && !specifierIsTypeOnly)) {
+        if (!importedBinding) {
           return;
         }
+
+        // Re-exporting a type-only import without `type` still only exports a type.
+        const specifierIsTypeOnly =
+          importedBinding.isTypeOnly || statement.exportKind === 'type' || specifier.exportKind === 'type';
 
         const sourceExportedBindings = parseExportedBindings(importedBinding.resolvedFilePath, analysisCaches);
         const resolvedTarget =
