@@ -164,6 +164,13 @@ export function collectExportedBindings(program: TSESTree.Program): Set<string> 
   }
 
   program.body.forEach(statement => {
+    if (
+      statement.type === AST_NODE_TYPES.ExportAllDeclaration &&
+      statement.exported?.type === AST_NODE_TYPES.Identifier
+    ) {
+      addExportedBinding(statement.exported.name, statement.exportKind === 'type');
+    }
+
     if (statement.type === AST_NODE_TYPES.ExportNamedDeclaration) {
       if (statement.declaration) {
         switch (statement.declaration.type) {
@@ -346,7 +353,13 @@ export function collectBarrelAnalysis(
   const exportAllReExports = new Map<string, ReExportTarget>();
   const importedBindings = new Map<
     string,
-    { importedName: string; isTypeOnly: boolean; resolvedFilePath: string; sourceSpecifier: string }
+    {
+      importedName: string;
+      isNamespace: boolean;
+      isTypeOnly: boolean;
+      resolvedFilePath: string;
+      sourceSpecifier: string;
+    }
   >();
 
   program.body.forEach(statement => {
@@ -365,8 +378,10 @@ export function collectBarrelAnalysis(
     }
 
     statement.specifiers.forEach(specifier => {
-      const importedName =
-        specifier.type === AST_NODE_TYPES.ImportDefaultSpecifier
+      const isNamespace = specifier.type === AST_NODE_TYPES.ImportNamespaceSpecifier;
+      const importedName = isNamespace
+        ? '*'
+        : specifier.type === AST_NODE_TYPES.ImportDefaultSpecifier
           ? 'default'
           : specifier.type === AST_NODE_TYPES.ImportSpecifier && specifier.imported.type === AST_NODE_TYPES.Identifier
             ? specifier.imported.name
@@ -378,6 +393,7 @@ export function collectBarrelAnalysis(
 
       importedBindings.set(specifier.local.name, {
         importedName,
+        isNamespace,
         isTypeOnly:
           statement.importKind === 'type' ||
           (specifier.type === AST_NODE_TYPES.ImportSpecifier && specifier.importKind === 'type'),
@@ -386,6 +402,76 @@ export function collectBarrelAnalysis(
       });
     });
   });
+
+  function addImportedReExport(
+    exportedName: string,
+    importedBinding: {
+      importedName: string;
+      isNamespace: boolean;
+      isTypeOnly: boolean;
+      resolvedFilePath: string;
+      sourceSpecifier: string;
+    },
+    exportIsTypeOnly: boolean,
+  ): void {
+    // Re-exporting a type-only import without `type` still only exports a type.
+    const isTypeOnly = importedBinding.isTypeOnly || exportIsTypeOnly;
+
+    if (importedBinding.isNamespace) {
+      explicitReExports.set(getReExportKey(exportedName, isTypeOnly), {
+        importedName: importedBinding.importedName,
+        resolvedFilePath: importedBinding.resolvedFilePath,
+        sourceSpecifier: importedBinding.sourceSpecifier,
+        isTypeOnly,
+        fromExportAll: false,
+        isNamespace: true,
+      });
+
+      return;
+    }
+
+    const sourceExportedBindings = parseExportedBindings(importedBinding.resolvedFilePath, analysisCaches);
+    const resolvedTarget =
+      resolveReExportTarget(
+        importedBinding.resolvedFilePath,
+        importedBinding.importedName,
+        isTypeOnly,
+        resolveImport,
+        analysisCaches,
+        visitedTargets,
+      ) ??
+      ({
+        importedName: importedBinding.importedName,
+        resolvedFilePath: importedBinding.resolvedFilePath,
+        sourceSpecifier: importedBinding.sourceSpecifier,
+        isTypeOnly,
+        fromExportAll: false,
+      } satisfies ReExportTarget);
+
+    if (resolvedTarget.resolvedFilePath === barrelFilePath) {
+      return;
+    }
+
+    explicitReExports.set(getReExportKey(exportedName, isTypeOnly), {
+      importedName: resolvedTarget.importedName,
+      resolvedFilePath: resolvedTarget.resolvedFilePath,
+      sourceSpecifier: resolvedTarget.sourceSpecifier,
+      isTypeOnly,
+      fromExportAll: false,
+      isNamespace: resolvedTarget.isNamespace,
+    });
+
+    if (!isTypeOnly && sourceExportedBindings.has(getReExportKey(importedBinding.importedName, true))) {
+      explicitReExports.set(getReExportKey(exportedName, true), {
+        importedName: resolvedTarget.importedName,
+        resolvedFilePath: resolvedTarget.resolvedFilePath,
+        sourceSpecifier: resolvedTarget.sourceSpecifier,
+        isTypeOnly: true,
+        fromExportAll: false,
+        isNamespace: resolvedTarget.isNamespace,
+      });
+    }
+  }
 
   program.body.forEach(statement => {
     const source = statement.type === AST_NODE_TYPES.ExportNamedDeclaration ? statement.source : null;
@@ -439,6 +525,7 @@ export function collectBarrelAnalysis(
           sourceSpecifier: resolvedTarget.sourceSpecifier,
           isTypeOnly: specifierIsTypeOnly,
           fromExportAll: false,
+          isNamespace: resolvedTarget.isNamespace,
         });
 
         if (!specifierIsTypeOnly && sourceExportedBindings.has(getReExportKey(specifier.local.name, true))) {
@@ -448,6 +535,7 @@ export function collectBarrelAnalysis(
             sourceSpecifier: resolvedTarget.sourceSpecifier,
             isTypeOnly: true,
             fromExportAll: false,
+            isNamespace: resolvedTarget.isNamespace,
           });
         }
       });
@@ -469,50 +557,45 @@ export function collectBarrelAnalysis(
           return;
         }
 
-        // Re-exporting a type-only import without `type` still only exports a type.
-        const specifierIsTypeOnly =
-          importedBinding.isTypeOnly || statement.exportKind === 'type' || specifier.exportKind === 'type';
-
-        const sourceExportedBindings = parseExportedBindings(importedBinding.resolvedFilePath, analysisCaches);
-        const resolvedTarget =
-          resolveReExportTarget(
-            importedBinding.resolvedFilePath,
-            importedBinding.importedName,
-            specifierIsTypeOnly,
-            resolveImport,
-            analysisCaches,
-            visitedTargets,
-          ) ??
-          ({
-            importedName: importedBinding.importedName,
-            resolvedFilePath: importedBinding.resolvedFilePath,
-            sourceSpecifier: importedBinding.sourceSpecifier,
-            isTypeOnly: specifierIsTypeOnly,
-            fromExportAll: false,
-          } satisfies ReExportTarget);
-
-        if (resolvedTarget.resolvedFilePath === barrelFilePath) {
-          return;
-        }
-
-        explicitReExports.set(getReExportKey(specifier.exported.name, specifierIsTypeOnly), {
-          importedName: resolvedTarget.importedName,
-          resolvedFilePath: resolvedTarget.resolvedFilePath,
-          sourceSpecifier: resolvedTarget.sourceSpecifier,
-          isTypeOnly: specifierIsTypeOnly,
-          fromExportAll: false,
-        });
-
-        if (!specifierIsTypeOnly && sourceExportedBindings.has(getReExportKey(importedBinding.importedName, true))) {
-          explicitReExports.set(getReExportKey(specifier.exported.name, true), {
-            importedName: resolvedTarget.importedName,
-            resolvedFilePath: resolvedTarget.resolvedFilePath,
-            sourceSpecifier: resolvedTarget.sourceSpecifier,
-            isTypeOnly: true,
-            fromExportAll: false,
-          });
-        }
+        addImportedReExport(
+          specifier.exported.name,
+          importedBinding,
+          statement.exportKind === 'type' || specifier.exportKind === 'type',
+        );
       });
+    }
+
+    if (
+      statement.type === AST_NODE_TYPES.ExportDefaultDeclaration &&
+      statement.declaration.type === AST_NODE_TYPES.Identifier
+    ) {
+      const importedBinding = importedBindings.get(statement.declaration.name);
+
+      if (importedBinding) {
+        addImportedReExport('default', importedBinding, false);
+      }
+    }
+
+    if (
+      statement.type === AST_NODE_TYPES.ExportAllDeclaration &&
+      statement.exported?.type === AST_NODE_TYPES.Identifier &&
+      statement.source.type === AST_NODE_TYPES.Literal &&
+      typeof statement.source.value === 'string'
+    ) {
+      const resolvedSourceFile = resolveImport(barrelFilePath, statement.source.value);
+
+      if (resolvedSourceFile && resolvedSourceFile !== barrelFilePath) {
+        const isTypeOnly = statement.exportKind === 'type';
+
+        explicitReExports.set(getReExportKey(statement.exported.name, isTypeOnly), {
+          importedName: '*',
+          resolvedFilePath: resolvedSourceFile,
+          sourceSpecifier: statement.source.value,
+          isTypeOnly,
+          fromExportAll: false,
+          isNamespace: true,
+        });
+      }
     }
 
     if (
@@ -573,6 +656,7 @@ export function collectBarrelAnalysis(
           sourceSpecifier: resolvedTarget.sourceSpecifier,
           isTypeOnly,
           fromExportAll: true,
+          isNamespace: resolvedTarget.isNamespace,
         });
       });
     }

@@ -36,7 +36,11 @@ ruleTester.run('prefer-source-imports', preferSourceImports, {
       filename: path.join(fixtureDirectory, 'consumer.ts'),
     },
     {
-      code: `import { LocalNamespace } from './local-barrel-namespace';`,
+      code: `import { Missing } from './namespace-star-unresolved-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+    },
+    {
+      code: `import { Self } from './namespace-star-self-barrel';`,
       filename: path.join(fixtureDirectory, 'consumer.ts'),
     },
     {
@@ -241,6 +245,66 @@ ruleTester.run('prefer-source-imports', preferSourceImports, {
       code: `import type { TypeFoo } from './local-barrel-invalid-type';`,
       filename: path.join(fixtureDirectory, 'consumer.ts'),
       output: `import type { TypeFoo } from './types';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { LocalNamespace } from './local-barrel-namespace';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import * as LocalNamespace from './foo';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { FooNs } from './namespace-star-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import * as FooNs from './foo';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { FooNs } from './nested-namespace-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import * as FooNs from './foo';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { FooNs } from './export-all-namespace-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import * as FooNs from './foo';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { TypeNs } from './namespace-type-star-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import type * as TypeNs from './types';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import Namespace from './default-namespace-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import * as Namespace from './foo';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { FooNs, Foo } from './namespace-star-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: null,
+      errors: [{ messageId: 'preferSourceImport' }, { messageId: 'preferSourceImport' }],
+    },
+    {
+      code: `import DefaultThing from './default-local-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import { default as DefaultThing } from './default-thing';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import Renamed from './default-nested-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import { default as Renamed } from './default-thing';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { FooNs } from "./namespace-star-barrel";`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import * as FooNs from "./foo";`,
       errors: [{ messageId: 'preferSourceImports' }],
     },
     {

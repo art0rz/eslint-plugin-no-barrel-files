@@ -148,6 +148,52 @@ describe('prefer-source-imports private helpers', () => {
     expect(findConfigFile).toHaveBeenCalledTimes(1);
   });
 
+  it('ignores namespace re-exports and imports it cannot resolve', () => {
+    const barrelPath = path.join(os.tmpdir(), 'namespace-barrel.ts');
+    const program = {
+      type: AST_NODE_TYPES.Program,
+      body: [
+        {
+          type: AST_NODE_TYPES.ImportDeclaration,
+          importKind: 'value',
+          source: { type: AST_NODE_TYPES.Literal, value: './foo' },
+          specifiers: [
+            {
+              type: AST_NODE_TYPES.ImportSpecifier,
+              importKind: 'value',
+              imported: { type: AST_NODE_TYPES.Literal, value: 'string-name' },
+              local: { type: AST_NODE_TYPES.Identifier, name: 'Local' },
+            },
+          ],
+        },
+        {
+          type: AST_NODE_TYPES.ExportAllDeclaration,
+          exportKind: 'value',
+          exported: { type: AST_NODE_TYPES.Literal, value: 'string-name' },
+          source: { type: AST_NODE_TYPES.Literal, value: './foo' },
+        },
+        {
+          type: AST_NODE_TYPES.ExportAllDeclaration,
+          exportKind: 'value',
+          exported: { type: AST_NODE_TYPES.Identifier, name: 'Missing' },
+          source: { type: AST_NODE_TYPES.Literal, value: './missing' },
+        },
+        {
+          type: AST_NODE_TYPES.ExportAllDeclaration,
+          exportKind: 'value',
+          exported: { type: AST_NODE_TYPES.Identifier, name: 'Self' },
+          source: { type: AST_NODE_TYPES.Literal, value: './self' },
+        },
+      ],
+    } as any;
+
+    const analysis = __private__.collectBarrelAnalysis(program, barrelPath, (_importer, specifier) =>
+      specifier === './self' ? barrelPath : specifier === './foo' ? path.join(os.tmpdir(), 'foo.ts') : null,
+    );
+
+    expect(analysis).toBeNull();
+  });
+
   it('covers parseModule read and parse failures', () => {
     vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
       throw new Error('boom');
