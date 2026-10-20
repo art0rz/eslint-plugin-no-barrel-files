@@ -36,10 +36,6 @@ ruleTester.run('prefer-source-imports', preferSourceImports, {
       filename: path.join(fixtureDirectory, 'consumer.ts'),
     },
     {
-      code: `import { TypeFoo } from './local-barrel-invalid-type';`,
-      filename: path.join(fixtureDirectory, 'consumer.ts'),
-    },
-    {
       code: `import { LocalNamespace } from './local-barrel-namespace';`,
       filename: path.join(fixtureDirectory, 'consumer.ts'),
     },
@@ -231,6 +227,18 @@ ruleTester.run('prefer-source-imports', preferSourceImports, {
     },
     {
       code: `import { type TypeFoo } from './barrel-type-star';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import type { TypeFoo } from './types';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { TypeFoo } from './local-barrel-invalid-type';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import type { TypeFoo } from './types';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import type { TypeFoo } from './local-barrel-invalid-type';`,
       filename: path.join(fixtureDirectory, 'consumer.ts'),
       output: `import type { TypeFoo } from './types';`,
       errors: [{ messageId: 'preferSourceImports' }],
