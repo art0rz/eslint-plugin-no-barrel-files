@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { AST_NODE_TYPES, TSESTree } from '@typescript-eslint/utils';
-import { AnalysisCaches, BarrelAnalysis, ReExportTarget } from './types';
+import { AnalysisCaches, BarrelAnalysis, ReExportOrigin, ReExportTarget } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const parser = require('@typescript-eslint/parser');
@@ -351,29 +351,115 @@ export function collectBarrelAnalysis(
 ): BarrelAnalysis | null {
   const explicitReExports = new Map<string, ReExportTarget>();
   const exportAllReExports = new Map<string, ReExportTarget>();
-  const importedBindings = new Map<
-    string,
-    {
-      importedName: string;
-      isNamespace: boolean;
-      isTypeOnly: boolean;
-      resolvedFilePath: string;
-      sourceSpecifier: string;
-    }
-  >();
+  const importedBindings = new Map<string, ReExportOrigin>();
 
-  program.body.forEach(statement => {
-    if (
-      statement.type !== AST_NODE_TYPES.ImportDeclaration ||
-      statement.source.type !== AST_NODE_TYPES.Literal ||
-      typeof statement.source.value !== 'string'
-    ) {
+  function resolveSource(
+    source: TSESTree.Node | null,
+  ): Pick<ReExportOrigin, 'resolvedFilePath' | 'sourceSpecifier'> | null {
+    if (source?.type !== AST_NODE_TYPES.Literal || typeof source.value !== 'string') {
+      return null;
+    }
+
+    const resolvedFilePath = resolveImport(barrelFilePath, source.value);
+
+    return resolvedFilePath ? { resolvedFilePath, sourceSpecifier: source.value } : null;
+  }
+
+  // Follow a re-export to the module that really defines it, falling back to the module it names.
+  function chaseTarget(
+    importedName: string,
+    source: Pick<ReExportOrigin, 'resolvedFilePath' | 'sourceSpecifier'>,
+    isTypeOnly: boolean,
+    fromExportAll: boolean,
+  ): ReExportTarget {
+    return (
+      resolveReExportTarget(
+        source.resolvedFilePath,
+        importedName,
+        isTypeOnly,
+        resolveImport,
+        analysisCaches,
+        visitedTargets,
+      ) ?? {
+        importedName,
+        resolvedFilePath: source.resolvedFilePath,
+        sourceSpecifier: source.sourceSpecifier,
+        isTypeOnly,
+        fromExportAll,
+      }
+    );
+  }
+
+  function toRegisteredTarget(target: ReExportTarget, isTypeOnly: boolean, fromExportAll: boolean): ReExportTarget {
+    return {
+      importedName: target.importedName,
+      resolvedFilePath: target.resolvedFilePath,
+      sourceSpecifier: target.sourceSpecifier,
+      isTypeOnly,
+      fromExportAll,
+      isNamespace: target.isNamespace,
+    };
+  }
+
+  function addExplicitReExport(exportedName: string, origin: ReExportOrigin, exportIsTypeOnly: boolean): void {
+    // Re-exporting a type-only import without `type` still only exports a type.
+    const isTypeOnly = origin.isTypeOnly || exportIsTypeOnly;
+    const target: ReExportTarget = origin.isNamespace
+      ? { ...origin, isTypeOnly, fromExportAll: false }
+      : chaseTarget(origin.importedName, origin, isTypeOnly, false);
+
+    if (target.resolvedFilePath === barrelFilePath) {
       return;
     }
 
-    const resolvedSourceFile = resolveImport(barrelFilePath, statement.source.value);
+    explicitReExports.set(getReExportKey(exportedName, isTypeOnly), toRegisteredTarget(target, isTypeOnly, false));
 
-    if (!resolvedSourceFile) {
+    if (
+      !origin.isNamespace &&
+      !isTypeOnly &&
+      parseExportedBindings(origin.resolvedFilePath, analysisCaches).has(getReExportKey(origin.importedName, true))
+    ) {
+      explicitReExports.set(getReExportKey(exportedName, true), toRegisteredTarget(target, true, false));
+    }
+  }
+
+  function addExportAllReExports(statement: TSESTree.ExportAllDeclaration, source: ReturnType<typeof resolveSource>) {
+    if (!source) {
+      return;
+    }
+
+    collectAllExportedBindings(
+      source.resolvedFilePath,
+      resolveImport,
+      analysisCaches,
+      new Set([barrelFilePath]),
+    ).forEach(reExportKey => {
+      const { exportedName, isTypeOnly } = getReExportMeta(reExportKey);
+
+      if (statement.exportKind === 'type' && !isTypeOnly) {
+        return;
+      }
+
+      if (explicitReExports.has(reExportKey) || exportAllReExports.has(reExportKey)) {
+        return;
+      }
+
+      const target = chaseTarget(exportedName, source, isTypeOnly, true);
+
+      if (target.resolvedFilePath !== barrelFilePath) {
+        exportAllReExports.set(reExportKey, toRegisteredTarget(target, isTypeOnly, true));
+      }
+    });
+  }
+
+  program.body.forEach(statement => {
+    if (statement.type !== AST_NODE_TYPES.ImportDeclaration) {
+      return;
+    }
+
+    const source = resolveSource(statement.source);
+
+    if (!source) {
       return;
     }
 
@@ -397,95 +483,14 @@ export function collectBarrelAnalysis(
         isTypeOnly:
           statement.importKind === 'type' ||
           (specifier.type === AST_NODE_TYPES.ImportSpecifier && specifier.importKind === 'type'),
-        resolvedFilePath: resolvedSourceFile,
-        sourceSpecifier: statement.source.value,
+        ...source,
       });
     });
   });
 
-  function addImportedReExport(
-    exportedName: string,
-    importedBinding: {
-      importedName: string;
-      isNamespace: boolean;
-      isTypeOnly: boolean;
-      resolvedFilePath: string;
-      sourceSpecifier: string;
-    },
-    exportIsTypeOnly: boolean,
-  ): void {
-    // Re-exporting a type-only import without `type` still only exports a type.
-    const isTypeOnly = importedBinding.isTypeOnly || exportIsTypeOnly;
-
-    if (importedBinding.isNamespace) {
-      explicitReExports.set(getReExportKey(exportedName, isTypeOnly), {
-        importedName: importedBinding.importedName,
-        resolvedFilePath: importedBinding.resolvedFilePath,
-        sourceSpecifier: importedBinding.sourceSpecifier,
-        isTypeOnly,
-        fromExportAll: false,
-        isNamespace: true,
-      });
-
-      return;
-    }
-
-    const sourceExportedBindings = parseExportedBindings(importedBinding.resolvedFilePath, analysisCaches);
-    const resolvedTarget =
-      resolveReExportTarget(
-        importedBinding.resolvedFilePath,
-        importedBinding.importedName,
-        isTypeOnly,
-        resolveImport,
-        analysisCaches,
-        visitedTargets,
-      ) ??
-      ({
-        importedName: importedBinding.importedName,
-        resolvedFilePath: importedBinding.resolvedFilePath,
-        sourceSpecifier: importedBinding.sourceSpecifier,
-        isTypeOnly,
-        fromExportAll: false,
-      } satisfies ReExportTarget);
-
-    if (resolvedTarget.resolvedFilePath === barrelFilePath) {
-      return;
-    }
-
-    explicitReExports.set(getReExportKey(exportedName, isTypeOnly), {
-      importedName: resolvedTarget.importedName,
-      resolvedFilePath: resolvedTarget.resolvedFilePath,
-      sourceSpecifier: resolvedTarget.sourceSpecifier,
-      isTypeOnly,
-      fromExportAll: false,
-      isNamespace: resolvedTarget.isNamespace,
-    });
-
-    if (!isTypeOnly && sourceExportedBindings.has(getReExportKey(importedBinding.importedName, true))) {
-      explicitReExports.set(getReExportKey(exportedName, true), {
-        importedName: resolvedTarget.importedName,
-        resolvedFilePath: resolvedTarget.resolvedFilePath,
-        sourceSpecifier: resolvedTarget.sourceSpecifier,
-        isTypeOnly: true,
-        fromExportAll: false,
-        isNamespace: resolvedTarget.isNamespace,
-      });
-    }
-  }
-
   program.body.forEach(statement => {
-    const source = statement.type === AST_NODE_TYPES.ExportNamedDeclaration ? statement.source : null;
-
-    if (
-      statement.type === AST_NODE_TYPES.ExportNamedDeclaration &&
-      source?.type === AST_NODE_TYPES.Literal &&
-      typeof source.value === 'string'
-    ) {
-      const resolvedSourceFile = resolveImport(barrelFilePath, source.value);
-
-      if (!resolvedSourceFile) {
-        return;
-      }
+    if (statement.type === AST_NODE_TYPES.ExportNamedDeclaration) {
+      const source = resolveSource(statement.source);
 
       statement.specifiers.forEach(specifier => {
         if (
@@ -496,72 +501,17 @@ export function collectBarrelAnalysis(
           return;
         }
 
-        const specifierIsTypeOnly = statement.exportKind === 'type' || specifier.exportKind === 'type';
-        const sourceExportedBindings = parseExportedBindings(resolvedSourceFile, analysisCaches);
-        const resolvedTarget =
-          resolveReExportTarget(
-            resolvedSourceFile,
-            specifier.local.name,
-            specifierIsTypeOnly,
-            resolveImport,
-            analysisCaches,
-            visitedTargets,
-          ) ??
-          ({
-            importedName: specifier.local.name,
-            resolvedFilePath: resolvedSourceFile,
-            sourceSpecifier: source.value,
-            isTypeOnly: specifierIsTypeOnly,
-            fromExportAll: false,
-          } satisfies ReExportTarget);
+        const origin = statement.source
+          ? source && { importedName: specifier.local.name, isNamespace: false, isTypeOnly: false, ...source }
+          : importedBindings.get(specifier.local.name);
 
-        if (resolvedTarget.resolvedFilePath === barrelFilePath) {
-          return;
+        if (origin) {
+          addExplicitReExport(
+            specifier.exported.name,
+            origin,
+            statement.exportKind === 'type' || specifier.exportKind === 'type',
+          );
         }
-
-        explicitReExports.set(getReExportKey(specifier.exported.name, specifierIsTypeOnly), {
-          importedName: resolvedTarget.importedName,
-          resolvedFilePath: resolvedTarget.resolvedFilePath,
-          sourceSpecifier: resolvedTarget.sourceSpecifier,
-          isTypeOnly: specifierIsTypeOnly,
-          fromExportAll: false,
-          isNamespace: resolvedTarget.isNamespace,
-        });
-
-        if (!specifierIsTypeOnly && sourceExportedBindings.has(getReExportKey(specifier.local.name, true))) {
-          explicitReExports.set(getReExportKey(specifier.exported.name, true), {
-            importedName: resolvedTarget.importedName,
-            resolvedFilePath: resolvedTarget.resolvedFilePath,
-            sourceSpecifier: resolvedTarget.sourceSpecifier,
-            isTypeOnly: true,
-            fromExportAll: false,
-            isNamespace: resolvedTarget.isNamespace,
-          });
-        }
-      });
-    }
-
-    if (statement.type === AST_NODE_TYPES.ExportNamedDeclaration && !statement.source) {
-      statement.specifiers.forEach(specifier => {
-        if (
-          specifier.type !== AST_NODE_TYPES.ExportSpecifier ||
-          specifier.local.type !== AST_NODE_TYPES.Identifier ||
-          specifier.exported.type !== AST_NODE_TYPES.Identifier
-        ) {
-          return;
-        }
-
-        const importedBinding = importedBindings.get(specifier.local.name);
-
-        if (!importedBinding) {
-          return;
-        }
-
-        addImportedReExport(
-          specifier.exported.name,
-          importedBinding,
-          statement.exportKind === 'type' || specifier.exportKind === 'type',
-        );
       });
     }
 
@@ -569,96 +519,25 @@ export function collectBarrelAnalysis(
       statement.type === AST_NODE_TYPES.ExportDefaultDeclaration &&
       statement.declaration.type === AST_NODE_TYPES.Identifier
     ) {
-      const importedBinding = importedBindings.get(statement.declaration.name);
+      const origin = importedBindings.get(statement.declaration.name);
 
-      if (importedBinding) {
-        addImportedReExport('default', importedBinding, false);
+      if (origin) {
+        addExplicitReExport('default', origin, false);
       }
     }
 
-    if (
-      statement.type === AST_NODE_TYPES.ExportAllDeclaration &&
-      statement.exported?.type === AST_NODE_TYPES.Identifier &&
-      statement.source.type === AST_NODE_TYPES.Literal &&
-      typeof statement.source.value === 'string'
-    ) {
-      const resolvedSourceFile = resolveImport(barrelFilePath, statement.source.value);
+    if (statement.type === AST_NODE_TYPES.ExportAllDeclaration) {
+      const source = resolveSource(statement.source);
 
-      if (resolvedSourceFile && resolvedSourceFile !== barrelFilePath) {
-        const isTypeOnly = statement.exportKind === 'type';
-
-        explicitReExports.set(getReExportKey(statement.exported.name, isTypeOnly), {
-          importedName: '*',
-          resolvedFilePath: resolvedSourceFile,
-          sourceSpecifier: statement.source.value,
-          isTypeOnly,
-          fromExportAll: false,
-          isNamespace: true,
-        });
+      if (!statement.exported) {
+        addExportAllReExports(statement, source);
+      } else if (source && statement.exported.type === AST_NODE_TYPES.Identifier) {
+        addExplicitReExport(
+          statement.exported.name,
+          { importedName: '*', isNamespace: true, isTypeOnly: false, ...source },
+          statement.exportKind === 'type',
+        );
       }
-    }
-
-    if (
-      statement.type === AST_NODE_TYPES.ExportAllDeclaration &&
-      !statement.exported &&
-      statement.source !== null &&
-      statement.source.type === AST_NODE_TYPES.Literal &&
-      typeof statement.source.value === 'string'
-    ) {
-      const resolvedSourceFile = resolveImport(barrelFilePath, statement.source.value);
-
-      if (!resolvedSourceFile) {
-        return;
-      }
-
-      const exportedBindings = collectAllExportedBindings(
-        resolvedSourceFile,
-        resolveImport,
-        analysisCaches,
-        new Set([barrelFilePath]),
-      );
-
-      exportedBindings.forEach(reExportKey => {
-        const { exportedName, isTypeOnly } = getReExportMeta(reExportKey);
-
-        if (statement.exportKind === 'type' && !isTypeOnly) {
-          return;
-        }
-
-        if (explicitReExports.has(reExportKey) || exportAllReExports.has(reExportKey)) {
-          return;
-        }
-
-        const resolvedTarget =
-          resolveReExportTarget(
-            resolvedSourceFile,
-            exportedName,
-            isTypeOnly,
-            resolveImport,
-            analysisCaches,
-            visitedTargets,
-          ) ??
-          ({
-            importedName: exportedName,
-            resolvedFilePath: resolvedSourceFile,
-            sourceSpecifier: statement.source.value,
-            isTypeOnly,
-            fromExportAll: true,
-          } satisfies ReExportTarget);
-
-        if (resolvedTarget.resolvedFilePath === barrelFilePath) {
-          return;
-        }
-
-        exportAllReExports.set(reExportKey, {
-          importedName: resolvedTarget.importedName,
-          resolvedFilePath: resolvedTarget.resolvedFilePath,
-          sourceSpecifier: resolvedTarget.sourceSpecifier,
-          isTypeOnly,
-          fromExportAll: true,
-          isNamespace: resolvedTarget.isNamespace,
-        });
-      });
     }
   });
 

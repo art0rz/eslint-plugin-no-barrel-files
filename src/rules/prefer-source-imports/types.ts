@@ -21,6 +21,15 @@ export type ReExportTarget = {
   isNamespace?: boolean | undefined;
 };
 
+// Where a re-exported binding comes from, before it has been followed to its defining module.
+export type ReExportOrigin = {
+  importedName: string;
+  isNamespace: boolean;
+  isTypeOnly: boolean;
+  resolvedFilePath: string;
+  sourceSpecifier: string;
+};
+
 export type NamedImportSpecifier = TSESTree.ImportSpecifier & {
   imported: TSESTree.Identifier;
   local: TSESTree.Identifier;
