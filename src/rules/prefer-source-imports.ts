@@ -5,8 +5,6 @@ import {
   collectAllExportedBindings,
   collectBarrelAnalysis,
   collectExportedBindings,
-  getReExportKey,
-  getReExportMeta,
   parseBarrelFile,
   parseExportedBindings,
   parseModule,
@@ -52,7 +50,6 @@ import {
   MessageIds,
   NamedImportSpecifier,
   Options,
-  ReExportTarget,
   SupportedImportSpecifier,
 } from './prefer-source-imports/types';
 
@@ -66,18 +63,6 @@ function isNamedImportSpecifier(specifier: TSESTree.ImportClause): specifier is 
 
 function isSupportedImportSpecifier(specifier: TSESTree.ImportClause): specifier is SupportedImportSpecifier {
   return specifier.type === AST_NODE_TYPES.ImportDefaultSpecifier || isNamedImportSpecifier(specifier);
-}
-
-function findReExport(reExports: Map<string, ReExportTarget>, reExportKeys: string[]): ReExportTarget | undefined {
-  for (const reExportKey of reExportKeys) {
-    const reExport = reExports.get(reExportKey);
-
-    if (reExport) {
-      return reExport;
-    }
-  }
-
-  return undefined;
 }
 
 function shouldReportMissingTypeScript(_filename: string, options: Options[0] | undefined): boolean {
@@ -202,30 +187,9 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
           const importedName =
             specifier.type === AST_NODE_TYPES.ImportDefaultSpecifier ? 'default' : specifier.imported.name;
           // A plain import may name a type, which TypeScript allows without the `type` modifier.
-          const reExportKeys = specifierIsTypeOnly
-            ? [getReExportKey(importedName, true)]
-            : [getReExportKey(importedName, false), getReExportKey(importedName, true)];
-          const explicitReExport = findReExport(barrelAnalysis.explicitReExports, reExportKeys);
-          if (explicitReExport) {
-            matchedSpecifiers.push({
-              preferredSourceSpecifier: getPreferredSourceSpecifier(
-                options,
-                importerFilename,
-                node.source.value,
-                explicitReExport,
-                resolutionCaches.tsconfigInfo,
-                cwd,
-                resolutionCaches.tsconfigPaths,
-              ),
-              specifier,
-              reExportTarget: explicitReExport,
-            });
-            return;
-          }
+          const reExportTarget = barrelAnalysis.lookup(importedName, specifierIsTypeOnly ? 'type' : 'value-or-type');
 
-          const exportAllReExport = findReExport(barrelAnalysis.exportAllReExports, reExportKeys);
-
-          if (!exportAllReExport) {
+          if (!reExportTarget) {
             return;
           }
 
@@ -234,13 +198,13 @@ const preferSourceImports: TSESLint.RuleModule<MessageIds, Options> = {
               options,
               importerFilename,
               node.source.value,
-              exportAllReExport,
+              reExportTarget,
               resolutionCaches.tsconfigInfo,
               cwd,
               resolutionCaches.tsconfigPaths,
             ),
             specifier,
-            reExportTarget: exportAllReExport,
+            reExportTarget,
           });
         });
 
@@ -314,8 +278,6 @@ export const __private__ = {
   hasTypeScriptModule,
   getMergeableImportDeclaration,
   getPreferredSourceSpecifier,
-  getReExportKey,
-  getReExportMeta,
   getTsconfigInfo,
   getTsconfigPath,
   isNamedImportSpecifier,

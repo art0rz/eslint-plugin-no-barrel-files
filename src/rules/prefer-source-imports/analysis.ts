@@ -12,11 +12,11 @@ export function createAnalysisCaches(): AnalysisCaches {
   };
 }
 
-export function getReExportKey(exportedName: string, isTypeOnly: boolean): string {
+function getReExportKey(exportedName: string, isTypeOnly: boolean): string {
   return `${isTypeOnly ? 'type' : 'value'}:${exportedName}`;
 }
 
-export function getReExportMeta(reExportKey: string): { exportedName: string; isTypeOnly: boolean } {
+function getReExportMeta(reExportKey: string): { exportedName: string; isTypeOnly: boolean } {
   if (reExportKey.startsWith('type:')) {
     return {
       exportedName: reExportKey.slice(5),
@@ -337,9 +337,7 @@ export function resolveReExportTarget(
     return null;
   }
 
-  return (
-    barrelAnalysis.explicitReExports.get(reExportKey) ?? barrelAnalysis.exportAllReExports.get(reExportKey) ?? null
-  );
+  return barrelAnalysis.lookup(exportedName, isTypeOnly ? 'type' : 'value') ?? null;
 }
 
 export function collectBarrelAnalysis(
@@ -546,8 +544,25 @@ export function collectBarrelAnalysis(
   }
 
   return {
-    explicitReExports,
-    exportAllReExports,
+    lookup(importedName, kind) {
+      const keys =
+        kind === 'value-or-type'
+          ? [getReExportKey(importedName, false), getReExportKey(importedName, true)]
+          : [getReExportKey(importedName, kind === 'type')];
+
+      // An explicit re-export shadows `export *` of the same name.
+      for (const reExports of [explicitReExports, exportAllReExports]) {
+        for (const key of keys) {
+          const target = reExports.get(key);
+
+          if (target) {
+            return target;
+          }
+        }
+      }
+
+      return undefined;
+    },
   };
 }
 

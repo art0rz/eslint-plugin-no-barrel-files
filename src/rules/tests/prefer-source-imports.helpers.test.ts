@@ -78,9 +78,6 @@ describe('prefer-source-imports private helpers', () => {
     );
     expect(__private__.toRelativeImportSpecifier('/repo/src/nested/consumer.ts', '/repo/src/foo.ts')).toBe('../foo');
 
-    expect(__private__.getReExportKey('Foo', true)).toBe('type:Foo');
-    expect(__private__.getReExportMeta('type:Foo')).toEqual({ exportedName: 'Foo', isTypeOnly: true });
-    expect(__private__.getReExportMeta('value:Foo')).toEqual({ exportedName: 'Foo', isTypeOnly: false });
     expect(__private__.shouldReportMissingTypeScript('/repo/src/file.ts', {})).toBe(false);
     expect(__private__.shouldReportMissingTypeScript('/repo/src/file.js', {})).toBe(false);
     expect(__private__.shouldReportMissingTypeScript('/repo/src/file.js', { tsconfig: false })).toBe(false);
@@ -496,14 +493,14 @@ describe('prefer-source-imports private helpers', () => {
     expect(__private__.resolveReExportTarget(path.join(tempDir, 'cycle-a.ts'), 'Foo', false, resolve)).toBeNull();
 
     const explicitAnalysis = __private__.parseBarrelFile(path.join(tempDir, 'explicit-barrel.ts'), resolve);
-    expect(explicitAnalysis?.explicitReExports.get('value:Foo')).toEqual({
+    expect(explicitAnalysis?.lookup('Foo', 'value')).toEqual({
       importedName: 'Foo',
       resolvedFilePath: valueFile,
       sourceSpecifier: './value',
       isTypeOnly: false,
       fromExportAll: false,
     });
-    expect(explicitAnalysis?.explicitReExports.get('type:TypeFoo')).toEqual({
+    expect(explicitAnalysis?.lookup('TypeFoo', 'type')).toEqual({
       importedName: 'TypeFoo',
       resolvedFilePath: path.join(tempDir, 'types.ts'),
       sourceSpecifier: './types',
@@ -512,14 +509,14 @@ describe('prefer-source-imports private helpers', () => {
     });
 
     const starAnalysis = __private__.parseBarrelFile(path.join(tempDir, 'star-barrel.ts'), resolve);
-    expect(starAnalysis?.exportAllReExports.get('value:Foo')).toEqual({
+    expect(starAnalysis?.lookup('Foo', 'value')).toEqual({
       importedName: 'Foo',
       resolvedFilePath: valueFile,
       sourceSpecifier: './value',
       isTypeOnly: false,
       fromExportAll: true,
     });
-    expect(starAnalysis?.exportAllReExports.get('type:TypeFoo')).toEqual({
+    expect(starAnalysis?.lookup('TypeFoo', 'type')).toEqual({
       importedName: 'TypeFoo',
       resolvedFilePath: path.join(tempDir, 'types.ts'),
       sourceSpecifier: './types',
@@ -700,8 +697,12 @@ describe('prefer-source-imports private helpers', () => {
     );
 
     expect(analysis).not.toBeNull();
-    expect(Array.from(analysis!.explicitReExports.keys()).sort()).toEqual(['type:TypeOnly', 'value:Foo']);
-    expect(Array.from(analysis!.exportAllReExports.keys()).sort()).toEqual(['type:FromStarType', 'value:FromStar']);
+    expect(analysis!.lookup('Foo', 'value')?.fromExportAll).toBe(false);
+    expect(analysis!.lookup('TypeOnly', 'type')?.fromExportAll).toBe(false);
+    expect(analysis!.lookup('FromStar', 'value')?.fromExportAll).toBe(true);
+    expect(analysis!.lookup('FromStarType', 'type')?.fromExportAll).toBe(true);
+    expect(analysis!.lookup('TypeOnly', 'value')).toBeUndefined();
+    expect(analysis!.lookup('Foo', 'type')).toBeUndefined();
   });
 
   it('returns null barrel analysis when nothing is re-exported', () => {
@@ -1213,6 +1214,27 @@ describe('prefer-source-imports private helpers', () => {
     expect(reusedFromResolutionCache).toBe(first);
   });
 
+  it('looks up re-exports by kind with explicit re-exports shadowing export all', () => {
+    const tempDir = makeTempDir();
+    const resolve = (importerFilename: string, specifier: string) =>
+      __private__.resolveModuleFile(importerFilename, specifier);
+
+    writeFiles(tempDir, {
+      'a.ts': 'export const Foo = 1;\nexport type OnlyType = { id: string };',
+      'b.ts': 'export type Foo = { id: string };',
+      'barrel.ts': "export * from './a';\nexport type { Foo } from './b';",
+    });
+
+    const analysis = __private__.parseBarrelFile(path.join(tempDir, 'barrel.ts'), resolve);
+
+    expect(analysis?.lookup('Foo', 'value-or-type')?.resolvedFilePath).toBe(path.join(tempDir, 'b.ts'));
+    expect(analysis?.lookup('Foo', 'value')?.resolvedFilePath).toBe(path.join(tempDir, 'a.ts'));
+    expect(analysis?.lookup('Foo', 'type')?.resolvedFilePath).toBe(path.join(tempDir, 'b.ts'));
+    expect(analysis?.lookup('OnlyType', 'value-or-type')?.isTypeOnly).toBe(true);
+    expect(analysis?.lookup('OnlyType', 'value')).toBeUndefined();
+    expect(analysis?.lookup('Missing', 'value-or-type')).toBeUndefined();
+  });
+
   it('uses fresh analysis caches to observe rewritten barrel files across lint runs', () => {
     const tempDir = makeTempDir();
     const resolve = (importerFilename: string, specifier: string) =>
@@ -1227,27 +1249,23 @@ describe('prefer-source-imports private helpers', () => {
 
     const initialCaches = __private__.createAnalysisCaches();
     expect(
-      __private__.parseBarrelFile(barrelFilePath, resolve, initialCaches)?.explicitReExports.get('value:Foo')
-        ?.resolvedFilePath,
+      __private__.parseBarrelFile(barrelFilePath, resolve, initialCaches)?.lookup('Foo', 'value')?.resolvedFilePath,
     ).toBe(path.join(tempDir, 'value-a.ts'));
 
     fs.writeFileSync(barrelFilePath, "export { Bar } from './value-b';");
 
     expect(
-      __private__.parseBarrelFile(barrelFilePath, resolve, initialCaches)?.explicitReExports.has('value:Foo'),
+      __private__.parseBarrelFile(barrelFilePath, resolve, initialCaches)?.lookup('Foo', 'value') !== undefined,
     ).toBe(true);
     expect(
-      __private__.parseBarrelFile(barrelFilePath, resolve, initialCaches)?.explicitReExports.has('value:Bar'),
+      __private__.parseBarrelFile(barrelFilePath, resolve, initialCaches)?.lookup('Bar', 'value') !== undefined,
     ).toBe(false);
 
     const freshCaches = __private__.createAnalysisCaches();
     expect(
-      __private__.parseBarrelFile(barrelFilePath, resolve, freshCaches)?.explicitReExports.get('value:Bar')
-        ?.resolvedFilePath,
+      __private__.parseBarrelFile(barrelFilePath, resolve, freshCaches)?.lookup('Bar', 'value')?.resolvedFilePath,
     ).toBe(path.join(tempDir, 'value-b.ts'));
-    expect(__private__.parseBarrelFile(barrelFilePath, resolve, freshCaches)?.explicitReExports.has('value:Foo')).toBe(
-      false,
-    );
+    expect(__private__.parseBarrelFile(barrelFilePath, resolve, freshCaches)?.lookup('Foo', 'value')).toBeUndefined();
   });
 
   it('covers import serialization helpers and mergeable import detection', () => {
