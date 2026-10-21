@@ -158,27 +158,59 @@ Current scope:
 - default imports are rewritten when the barrel directly re-exports its default export
 - namespace imports are not the target of this rule
 
-#### Safe autofix behavior
+#### What gets fixed, reported, or ignored
 
-The rule only autofixes when it is confident the rewrite cannot change your code. When it is not, it still reports the problem and leaves the import untouched, so you can fix it by hand.
+The rule only autofixes when it is confident the rewrite cannot change your code. Every import it looks at ends up in one of three outcomes:
 
-It reports without an autofix when:
+| Outcome | Meaning |
+| --- | --- |
+| **Autofixed** | Reported, and the import is rewritten to the source module. |
+| **Reported only** | Reported with the source module to import from, but left untouched so you can fix it by hand. |
+| **Ignored** | Not reported at all. |
 
-- only part of the import can be resolved to a source module
-- the import has [import attributes](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import/with), such as `with { type: 'json' }`, because we can't tell they still apply to the source module
-- the import contains a comment, which the rewrite would delete
-- the import would be removed by merging it into an existing import and a comment sits on the line above it
-- several `export *` declarations in the barrel resolve the same name to different bindings (ambiguous in ESM)
-- the new import path would not resolve to the source module from the importing file, for example when the barrel re-exports through an alias that only the barrel's own `tsconfig.json` defines
+##### Autofixed
 
-`export *` never re-exports a default export, so a default import through an `export *` barrel is left alone.
+When none of the "reported only" conditions below apply, these are rewritten:
 
-Where it can be done safely, the rule does autofix:
+- named imports, renamed imports (`Foo as Bar`), and default imports the barrel re-exports directly (`export { default as Foo } from "./foo"`)
+- `import type { Foo }` and `import { type Foo }`
+- every re-export form listed under [What it can resolve](#what-it-can-resolve), including barrels that re-export from other barrels
+- imports whose names live in different source modules, which become one import per source module
+- imports that can be merged into an existing import from the same module: `import { Bar } from './foo'` plus `import { Foo } from './barrel'` becomes `import { Bar, Foo } from './foo'`
+- imports written with an explicit extension, which keep that style: `'./barrel.js'` becomes `'./foo.js'` (a `.ts` source is referenced by the `.js` extension it compiles to) and `'./barrel.ts'` becomes `'./foo.ts'`. Imports without an extension stay extensionless, and `.js` specifiers are resolved to their `.ts` source files
+- imports from a barrel whose own re-export declares [import attributes](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import/with); the attributes are copied onto the rewritten import (it is never merged into another import)
 
-- If the barrel's own re-export declares attributes, they are copied onto the rewritten import.
-- Imports written with an explicit extension keep that style: `'./barrel.js'` becomes `'./foo.js'` (a `.ts` source is referenced by the `.js` extension it compiles to), and `'./barrel.ts'` becomes `'./foo.ts'`. Imports without an extension stay extensionless. `.js` specifiers are resolved to their `.ts` source files. With `fixStyle: "preserve-alias"` an extension-style import is only reported, because aliases are written without extensions.
+Quote style is preserved, and the shape of the new path follows [`fixStyle`](#fixstyle).
 
-Merging into an existing import from the same module is skipped for imports that have attributes or comments inside them; the fixer adds a separate import instead.
+##### Reported only
+
+The rule still reports these, but leaves the import alone:
+
+- **Partly resolvable imports.** Only some of the names can be traced to a source module, for example `import { Foo, Local } from './barrel'` where the barrel defines `Local` itself. The resolvable names are reported.
+- **The import has attributes**, such as `with { type: 'json' }`. We can't tell they still apply to the source module.
+- **The import contains a comment**, which the rewrite would delete.
+- **A comment sits on the line above an import that a merge would delete**, because it would end up applying to the next statement.
+- **The new path would not resolve from your file.** For example, the barrel re-exports through an alias that only the barrel's own `tsconfig.json` defines.
+- **No safe path can be produced.** With `fixStyle: "preserve-alias"` there is no unique alias, or the import uses an explicit extension (aliases are written without one).
+- **Merging is ambiguous or conflicts.** More than one existing import from the source module could take the names, or a local name would clash.
+- **Conflicting attributes.** The barrel's re-exports declare different attributes for the same source module.
+
+Existing imports with attributes or comments inside them are never merged into; the fixer adds a separate import instead.
+
+##### Ignored
+
+These are not reported, so they never reach the autofix:
+
+- imports matching the [`ignore`](#ignore) option
+- side-effect imports (`import './barrel'`), namespace imports (`import * as Barrel from './barrel'`), and string-literal import names
+- names the barrel does not re-export: ones it defines itself (`export const Local = 1`), ones it does not export at all, and namespace re-exports (`export * as ns from "./foo"`)
+- re-exports from packages (`export { x } from "some-package"`), and anything else the rule cannot resolve to a local file, including imports of bare packages
+- barrels with no resolvable re-exports
+- a value import of a name the barrel re-exports with `export type`
+- a default import through `export *`, because `export *` never re-exports a default export
+- a name that several `export *` declarations resolve to different bindings, because it is ambiguous in ESM
+
+If `typescript` is not installed and tsconfig resolution is enabled, the rule reports a configuration error instead of doing any of the above. See [Notes](#notes).
 
 ## `prefer-source-imports` Options
 
