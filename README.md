@@ -165,14 +165,18 @@ The rule only autofixes when it is confident the rewrite cannot change your code
 It reports without an autofix when:
 
 - only part of the import can be resolved to a source module
-- the import has [import attributes](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import/with), such as `with { type: 'json' }`, or the barrel re-export it resolves through does
+- the import has [import attributes](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import/with), such as `with { type: 'json' }`, because we can't tell they still apply to the source module
 - the import contains a comment, which the rewrite would delete
 - the import would be removed by merging it into an existing import and a comment sits on the line above it
 - several `export *` declarations in the barrel resolve the same name to different bindings (ambiguous in ESM)
-- the import specifier has a file extension (for example `'./barrel.js'`), because rewritten specifiers are always extensionless
 - the new import path would not resolve to the source module from the importing file, for example when the barrel re-exports through an alias that only the barrel's own `tsconfig.json` defines
 
 `export *` never re-exports a default export, so a default import through an `export *` barrel is left alone.
+
+Where it can be done safely, the rule does autofix:
+
+- If the barrel's own re-export declares attributes, they are copied onto the rewritten import.
+- Imports written with an explicit extension keep that style: `'./barrel.js'` becomes `'./foo.js'` (a `.ts` source is referenced by the `.js` extension it compiles to), and `'./barrel.ts'` becomes `'./foo.ts'`. Imports without an extension stay extensionless. `.js` specifiers are resolved to their `.ts` source files. With `fixStyle: "preserve-alias"` an extension-style import is only reported, because aliases are written without extensions.
 
 Merging into an existing import from the same module is skipped for imports that have attributes or comments inside them; the fixer adds a separate import instead.
 

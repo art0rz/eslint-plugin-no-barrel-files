@@ -20,6 +20,7 @@ import {
   normalizeModulePath,
   resolveModuleFile,
   toRelativeImportSpecifier,
+  toRelativeImportSpecifierWithExtension,
 } from './path-utils';
 import type typescriptModule from 'typescript';
 
@@ -457,6 +458,30 @@ function getCandidateSourceSpecifier(
   return toRelativeImportSpecifier(importerFilename, reExportTarget.resolvedFilePath);
 }
 
+function getExtensionStyleSourceSpecifier(
+  options: Options[0] | undefined,
+  importerFilename: string,
+  originalImportSpecifier: string,
+  reExportTarget: ReExportTarget,
+): string | null {
+  const fixStyle = options?.fixStyle ?? 'auto';
+
+  if (fixStyle !== 'relative' && !isRelativePath(reExportTarget.sourceSpecifier)) {
+    return reExportTarget.sourceSpecifier;
+  }
+
+  // Aliases are written without extensions, which would change the style the project requires.
+  if (fixStyle === 'preserve-alias') {
+    return null;
+  }
+
+  return toRelativeImportSpecifierWithExtension(
+    importerFilename,
+    reExportTarget.resolvedFilePath,
+    originalImportSpecifier,
+  );
+}
+
 export function getPreferredSourceSpecifier(
   options: Options[0] | undefined,
   importerFilename: string,
@@ -466,20 +491,17 @@ export function getPreferredSourceSpecifier(
   cwd: string = process.cwd(),
   tsconfigPathCache: Map<string, string | null> = new Map<string, string | null>(),
 ): string | null {
-  // The rewritten specifier is always extensionless, which breaks projects that require explicit extensions.
-  if (hasSourceFileExtension(originalImportSpecifier)) {
-    return null;
-  }
-
-  const candidate = getCandidateSourceSpecifier(
-    options,
-    importerFilename,
-    originalImportSpecifier,
-    reExportTarget,
-    tsconfigCache,
-    cwd,
-    tsconfigPathCache,
-  );
+  const candidate = hasSourceFileExtension(originalImportSpecifier)
+    ? getExtensionStyleSourceSpecifier(options, importerFilename, originalImportSpecifier, reExportTarget)
+    : getCandidateSourceSpecifier(
+        options,
+        importerFilename,
+        originalImportSpecifier,
+        reExportTarget,
+        tsconfigCache,
+        cwd,
+        tsconfigPathCache,
+      );
 
   if (candidate === null) {
     return null;

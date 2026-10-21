@@ -340,10 +340,30 @@ export function resolveReExportTarget(
   );
 }
 
+function serializeAttributes(
+  node: TSESTree.ImportDeclaration | TSESTree.ExportNamedDeclaration | TSESTree.ExportAllDeclaration,
+): string | null {
+  const attributes = node.attributes ?? [];
+
+  if (attributes.length === 0) {
+    return null;
+  }
+
+  const entries = attributes.map(attribute => {
+    const key = attribute.key.type === AST_NODE_TYPES.Identifier ? attribute.key.name : attribute.key.raw;
+
+    return `${key}: ${attribute.value.raw}`;
+  });
+
+  return `with { ${entries.join(', ')} }`;
+}
+
 function attributesFlag(
   node: TSESTree.ImportDeclaration | TSESTree.ExportNamedDeclaration | TSESTree.ExportAllDeclaration,
-): { hasAttributes?: true } {
-  return (node.attributes?.length ?? 0) > 0 ? { hasAttributes: true } : {};
+): { attributes?: string } {
+  const attributes = serializeAttributes(node);
+
+  return attributes ? { attributes } : {};
 }
 
 export function collectBarrelAnalysis(
@@ -363,7 +383,7 @@ export function collectBarrelAnalysis(
       isTypeOnly: boolean;
       resolvedFilePath: string;
       sourceSpecifier: string;
-      hasAttributes?: true;
+      attributes?: string;
     }
   >();
 
@@ -457,7 +477,7 @@ export function collectBarrelAnalysis(
           importedName: resolvedTarget.importedName,
           resolvedFilePath: resolvedTarget.resolvedFilePath,
           sourceSpecifier: resolvedTarget.sourceSpecifier,
-          ...(resolvedTarget.hasAttributes ? { hasAttributes: true as const } : {}),
+          ...(resolvedTarget.attributes ? { attributes: resolvedTarget.attributes } : {}),
           isTypeOnly: specifierIsTypeOnly,
           fromExportAll: false,
         });
@@ -467,7 +487,7 @@ export function collectBarrelAnalysis(
             importedName: resolvedTarget.importedName,
             resolvedFilePath: resolvedTarget.resolvedFilePath,
             sourceSpecifier: resolvedTarget.sourceSpecifier,
-            ...(resolvedTarget.hasAttributes ? { hasAttributes: true as const } : {}),
+            ...(resolvedTarget.attributes ? { attributes: resolvedTarget.attributes } : {}),
             isTypeOnly: true,
             fromExportAll: false,
           });
@@ -508,7 +528,7 @@ export function collectBarrelAnalysis(
             sourceSpecifier: importedBinding.sourceSpecifier,
             isTypeOnly: specifierIsTypeOnly,
             fromExportAll: false,
-            ...(importedBinding.hasAttributes ? { hasAttributes: true as const } : {}),
+            ...(importedBinding.attributes ? { attributes: importedBinding.attributes } : {}),
           } satisfies ReExportTarget);
 
         if (resolvedTarget.resolvedFilePath === barrelFilePath) {
@@ -519,7 +539,7 @@ export function collectBarrelAnalysis(
           importedName: resolvedTarget.importedName,
           resolvedFilePath: resolvedTarget.resolvedFilePath,
           sourceSpecifier: resolvedTarget.sourceSpecifier,
-          ...(resolvedTarget.hasAttributes ? { hasAttributes: true as const } : {}),
+          ...(resolvedTarget.attributes ? { attributes: resolvedTarget.attributes } : {}),
           isTypeOnly: specifierIsTypeOnly,
           fromExportAll: false,
         });
@@ -529,7 +549,7 @@ export function collectBarrelAnalysis(
             importedName: resolvedTarget.importedName,
             resolvedFilePath: resolvedTarget.resolvedFilePath,
             sourceSpecifier: resolvedTarget.sourceSpecifier,
-            ...(resolvedTarget.hasAttributes ? { hasAttributes: true as const } : {}),
+            ...(resolvedTarget.attributes ? { attributes: resolvedTarget.attributes } : {}),
             isTypeOnly: true,
             fromExportAll: false,
           });
@@ -614,7 +634,7 @@ export function collectBarrelAnalysis(
           importedName: resolvedTarget.importedName,
           resolvedFilePath: resolvedTarget.resolvedFilePath,
           sourceSpecifier: resolvedTarget.sourceSpecifier,
-          ...(resolvedTarget.hasAttributes ? { hasAttributes: true as const } : {}),
+          ...(resolvedTarget.attributes ? { attributes: resolvedTarget.attributes } : {}),
           isTypeOnly,
           fromExportAll: true,
         });

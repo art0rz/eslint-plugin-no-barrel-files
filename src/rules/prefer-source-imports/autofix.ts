@@ -60,11 +60,8 @@ export function buildAutofix(
   currentNode: TSESTree.ImportDeclaration,
   matchedSpecifiers: MatchedSpecifier[],
 ): TSESLint.ReportFixFunction | null {
-  if (
-    hasImportAttributes(currentNode) ||
-    matchedSpecifiers.some(({ reExportTarget }) => reExportTarget.hasAttributes)
-  ) {
-    // Attributes describe how a specific module is loaded; we can't tell they still apply to the source module.
+  // Attributes on the import describe how the barrel is loaded; we can't tell they still apply to the source module.
+  if (hasImportAttributes(currentNode)) {
     return null;
   }
 
@@ -74,6 +71,10 @@ export function buildAutofix(
   }
 
   const groupedImports = new Map<string, Array<{ importedName: string; isTypeOnly: boolean; localName: string }>>();
+  // Attributes the barrel's own re-export declared; the source module needs them wherever it is imported.
+  const groupAttributes = new Map<string, string>();
+
+  let conflictingAttributes = false;
 
   matchedSpecifiers.forEach(({ preferredSourceSpecifier, specifier, reExportTarget }) => {
     if (!preferredSourceSpecifier) {
@@ -87,11 +88,28 @@ export function buildAutofix(
       localName: specifier.local.name,
     });
     groupedImports.set(preferredSourceSpecifier, importBindings);
+
+    if (reExportTarget.attributes) {
+      conflictingAttributes ||=
+        (groupAttributes.get(preferredSourceSpecifier) ?? reExportTarget.attributes) !== reExportTarget.attributes;
+      groupAttributes.set(preferredSourceSpecifier, reExportTarget.attributes);
+    } else if (groupAttributes.has(preferredSourceSpecifier)) {
+      conflictingAttributes = true;
+    }
   });
+
+  if (conflictingAttributes) {
+    return null;
+  }
 
   const mergeTargets = new Map<string, TSESTree.ImportDeclaration>();
 
   for (const sourceSpecifier of groupedImports.keys()) {
+    // Merging would apply the attributes to the existing import's other bindings.
+    if (groupAttributes.has(sourceSpecifier)) {
+      continue;
+    }
+
     const matchingDeclarations = sourceCode.ast.body.filter(
       statement =>
         statement.type === AST_NODE_TYPES.ImportDeclaration &&
@@ -195,7 +213,7 @@ export function buildAutofix(
         const allTypeOnly = bindings.every(binding => binding.isTypeOnly);
         const serializedBindings = serializeImportBindings(bindings, allTypeOnly);
 
-        return `import${allTypeOnly ? ' type' : ''} { ${serializedBindings} } from ${quote}${sourceSpecifier}${quote};`;
+        return `import${allTypeOnly ? ' type' : ''} { ${serializedBindings} } from ${quote}${sourceSpecifier}${quote}${groupAttributes.has(sourceSpecifier) ? ` ${groupAttributes.get(sourceSpecifier)}` : ''};`;
       })
       .join('\n');
 
