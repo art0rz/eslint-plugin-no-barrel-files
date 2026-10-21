@@ -283,7 +283,12 @@ export function collectAllExportedBindings(
     );
 
     nestedBindings.forEach(reExportKey => {
-      const { isTypeOnly } = getReExportMeta(reExportKey);
+      const { exportedName, isTypeOnly } = getReExportMeta(reExportKey);
+
+      // `export *` never re-exports a default export.
+      if (exportedName === 'default') {
+        return;
+      }
 
       if (statement.exportKind === 'type' && !isTypeOnly) {
         return;
@@ -335,6 +340,12 @@ export function resolveReExportTarget(
   );
 }
 
+function attributesFlag(
+  node: TSESTree.ImportDeclaration | TSESTree.ExportNamedDeclaration | TSESTree.ExportAllDeclaration,
+): { hasAttributes?: true } {
+  return (node.attributes?.length ?? 0) > 0 ? { hasAttributes: true } : {};
+}
+
 export function collectBarrelAnalysis(
   program: TSESTree.Program,
   barrelFilePath: string,
@@ -344,9 +355,16 @@ export function collectBarrelAnalysis(
 ): BarrelAnalysis | null {
   const explicitReExports = new Map<string, ReExportTarget>();
   const exportAllReExports = new Map<string, ReExportTarget>();
+  const ambiguousExportAllKeys = new Set<string>();
   const importedBindings = new Map<
     string,
-    { importedName: string; isTypeOnly: boolean; resolvedFilePath: string; sourceSpecifier: string }
+    {
+      importedName: string;
+      isTypeOnly: boolean;
+      resolvedFilePath: string;
+      sourceSpecifier: string;
+      hasAttributes?: true;
+    }
   >();
 
   program.body.forEach(statement => {
@@ -383,6 +401,7 @@ export function collectBarrelAnalysis(
           (specifier.type === AST_NODE_TYPES.ImportSpecifier && specifier.importKind === 'type'),
         resolvedFilePath: resolvedSourceFile,
         sourceSpecifier: statement.source.value,
+        ...attributesFlag(statement),
       });
     });
   });
@@ -427,6 +446,7 @@ export function collectBarrelAnalysis(
             sourceSpecifier: source.value,
             isTypeOnly: specifierIsTypeOnly,
             fromExportAll: false,
+            ...attributesFlag(statement),
           } satisfies ReExportTarget);
 
         if (resolvedTarget.resolvedFilePath === barrelFilePath) {
@@ -437,6 +457,7 @@ export function collectBarrelAnalysis(
           importedName: resolvedTarget.importedName,
           resolvedFilePath: resolvedTarget.resolvedFilePath,
           sourceSpecifier: resolvedTarget.sourceSpecifier,
+          ...(resolvedTarget.hasAttributes ? { hasAttributes: true as const } : {}),
           isTypeOnly: specifierIsTypeOnly,
           fromExportAll: false,
         });
@@ -446,6 +467,7 @@ export function collectBarrelAnalysis(
             importedName: resolvedTarget.importedName,
             resolvedFilePath: resolvedTarget.resolvedFilePath,
             sourceSpecifier: resolvedTarget.sourceSpecifier,
+            ...(resolvedTarget.hasAttributes ? { hasAttributes: true as const } : {}),
             isTypeOnly: true,
             fromExportAll: false,
           });
@@ -486,6 +508,7 @@ export function collectBarrelAnalysis(
             sourceSpecifier: importedBinding.sourceSpecifier,
             isTypeOnly: specifierIsTypeOnly,
             fromExportAll: false,
+            ...(importedBinding.hasAttributes ? { hasAttributes: true as const } : {}),
           } satisfies ReExportTarget);
 
         if (resolvedTarget.resolvedFilePath === barrelFilePath) {
@@ -496,6 +519,7 @@ export function collectBarrelAnalysis(
           importedName: resolvedTarget.importedName,
           resolvedFilePath: resolvedTarget.resolvedFilePath,
           sourceSpecifier: resolvedTarget.sourceSpecifier,
+          ...(resolvedTarget.hasAttributes ? { hasAttributes: true as const } : {}),
           isTypeOnly: specifierIsTypeOnly,
           fromExportAll: false,
         });
@@ -505,6 +529,7 @@ export function collectBarrelAnalysis(
             importedName: resolvedTarget.importedName,
             resolvedFilePath: resolvedTarget.resolvedFilePath,
             sourceSpecifier: resolvedTarget.sourceSpecifier,
+            ...(resolvedTarget.hasAttributes ? { hasAttributes: true as const } : {}),
             isTypeOnly: true,
             fromExportAll: false,
           });
@@ -535,11 +560,16 @@ export function collectBarrelAnalysis(
       exportedBindings.forEach(reExportKey => {
         const { exportedName, isTypeOnly } = getReExportMeta(reExportKey);
 
+        // `export *` never re-exports a default export.
+        if (exportedName === 'default') {
+          return;
+        }
+
         if (statement.exportKind === 'type' && !isTypeOnly) {
           return;
         }
 
-        if (explicitReExports.has(reExportKey) || exportAllReExports.has(reExportKey)) {
+        if (explicitReExports.has(reExportKey) || ambiguousExportAllKeys.has(reExportKey)) {
           return;
         }
 
@@ -558,9 +588,25 @@ export function collectBarrelAnalysis(
             sourceSpecifier: statement.source.value,
             isTypeOnly,
             fromExportAll: true,
+            ...attributesFlag(statement),
           } satisfies ReExportTarget);
 
         if (resolvedTarget.resolvedFilePath === barrelFilePath) {
+          return;
+        }
+
+        const existingTarget = exportAllReExports.get(reExportKey);
+
+        if (existingTarget) {
+          // ESM treats a name exported by several `export *` declarations as ambiguous unless they are the same binding.
+          if (
+            existingTarget.resolvedFilePath !== resolvedTarget.resolvedFilePath ||
+            existingTarget.importedName !== resolvedTarget.importedName
+          ) {
+            exportAllReExports.delete(reExportKey);
+            ambiguousExportAllKeys.add(reExportKey);
+          }
+
           return;
         }
 
@@ -568,6 +614,7 @@ export function collectBarrelAnalysis(
           importedName: resolvedTarget.importedName,
           resolvedFilePath: resolvedTarget.resolvedFilePath,
           sourceSpecifier: resolvedTarget.sourceSpecifier,
+          ...(resolvedTarget.hasAttributes ? { hasAttributes: true as const } : {}),
           isTypeOnly,
           fromExportAll: true,
         });

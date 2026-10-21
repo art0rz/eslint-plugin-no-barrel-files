@@ -160,9 +160,21 @@ Current scope:
 
 #### Safe autofix behavior
 
-The rule only autofixes when the full import declaration can be rewritten safely.
+The rule only autofixes when it is confident the rewrite cannot change your code. When it is not, it still reports the problem and leaves the import untouched, so you can fix it by hand.
 
-If only part of an import can be resolved safely, the rule still reports the problem but may skip autofix.
+It reports without an autofix when:
+
+- only part of the import can be resolved to a source module
+- the import has [import attributes](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import/with), such as `with { type: 'json' }`, or the barrel re-export it resolves through does
+- the import contains a comment, which the rewrite would delete
+- the import would be removed by merging it into an existing import and a comment sits on the line above it
+- several `export *` declarations in the barrel resolve the same name to different bindings (ambiguous in ESM)
+- the import specifier has a file extension (for example `'./barrel.js'`), because rewritten specifiers are always extensionless
+- the new import path would not resolve to the source module from the importing file, for example when the barrel re-exports through an alias that only the barrel's own `tsconfig.json` defines
+
+`export *` never re-exports a default export, so a default import through an `export *` barrel is left alone.
+
+Merging into an existing import from the same module is skipped for imports that have attributes or comments inside them; the fixer adds a separate import instead.
 
 ## `prefer-source-imports` Options
 

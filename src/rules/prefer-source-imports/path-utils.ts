@@ -16,6 +16,10 @@ export function isRelativePath(value: string): boolean {
   return value.startsWith('.');
 }
 
+export function hasSourceFileExtension(specifier: string): boolean {
+  return SOURCE_FILE_EXTENSIONS.some(extension => specifier.endsWith(extension));
+}
+
 export function resolveModuleFile(importerFilename: string, specifier: string): string | null {
   const cacheKey = `${importerFilename}\0${specifier}`;
   const cachedResult = moduleFileResolutionCache.get(cacheKey);

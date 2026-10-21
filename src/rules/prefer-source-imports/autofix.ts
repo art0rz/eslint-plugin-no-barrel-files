@@ -8,6 +8,10 @@ export function isTypeOnlyImport(
   return declaration.importKind === 'type' || specifier?.importKind === 'type';
 }
 
+function hasImportAttributes(node: TSESTree.ImportDeclaration): boolean {
+  return (node.attributes?.length ?? 0) > 0;
+}
+
 export function serializeImportBinding(importedName: string, localName: string, isTypeOnly: boolean): string {
   if (importedName === 'default') {
     return `${isTypeOnly ? 'type ' : ''}default as ${localName}`;
@@ -33,7 +37,7 @@ export function getMergeableImportDeclaration(
   node: TSESTree.ImportDeclaration,
   sourceSpecifier: string,
 ): TSESTree.ImportDeclaration | null {
-  if (node.source.value !== sourceSpecifier) {
+  if (node.source.value !== sourceSpecifier || hasImportAttributes(node)) {
     return null;
   }
 
@@ -56,6 +60,19 @@ export function buildAutofix(
   currentNode: TSESTree.ImportDeclaration,
   matchedSpecifiers: MatchedSpecifier[],
 ): TSESLint.ReportFixFunction | null {
+  if (
+    hasImportAttributes(currentNode) ||
+    matchedSpecifiers.some(({ reExportTarget }) => reExportTarget.hasAttributes)
+  ) {
+    // Attributes describe how a specific module is loaded; we can't tell they still apply to the source module.
+    return null;
+  }
+
+  // Rewriting the declaration from text would delete any comment inside it.
+  if (sourceCode.getCommentsInside(currentNode).length > 0) {
+    return null;
+  }
+
   const groupedImports = new Map<string, Array<{ importedName: string; isTypeOnly: boolean; localName: string }>>();
 
   matchedSpecifiers.forEach(({ preferredSourceSpecifier, specifier, reExportTarget }) => {
@@ -79,7 +96,8 @@ export function buildAutofix(
       statement =>
         statement.type === AST_NODE_TYPES.ImportDeclaration &&
         statement !== currentNode &&
-        getMergeableImportDeclaration(statement, sourceSpecifier),
+        getMergeableImportDeclaration(statement, sourceSpecifier) &&
+        sourceCode.getCommentsInside(statement).length === 0,
     ) as TSESTree.ImportDeclaration[];
 
     if (matchingDeclarations.length > 1) {
@@ -89,6 +107,15 @@ export function buildAutofix(
     if (matchingDeclarations.length === 1) {
       mergeTargets.set(sourceSpecifier, matchingDeclarations[0]!);
     }
+  }
+
+  // When every binding merges into an existing import, the declaration is deleted outright. A comment on the line
+  // above it (e.g. a directive) would then end up applying to whatever follows.
+  if (
+    mergeTargets.size === groupedImports.size &&
+    sourceCode.getCommentsBefore(currentNode).some(comment => comment.loc.end.line === currentNode.loc.start.line - 1)
+  ) {
+    return null;
   }
 
   return fixer => {

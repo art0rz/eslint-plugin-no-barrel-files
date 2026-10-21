@@ -14,6 +14,7 @@ import {
   applyAliasTarget,
   buildAliasSpecifier,
   getOptionsCacheKey,
+  hasSourceFileExtension,
   isRelativePath,
   matchesAliasPattern,
   normalizeModulePath,
@@ -413,7 +414,7 @@ export function reverseResolveTsconfigAlias(
   return candidateAliases.length === 1 ? candidateAliases[0]! : null;
 }
 
-export function getPreferredSourceSpecifier(
+function getCandidateSourceSpecifier(
   options: Options[0] | undefined,
   importerFilename: string,
   originalImportSpecifier: string,
@@ -454,6 +455,46 @@ export function getPreferredSourceSpecifier(
   }
 
   return toRelativeImportSpecifier(importerFilename, reExportTarget.resolvedFilePath);
+}
+
+export function getPreferredSourceSpecifier(
+  options: Options[0] | undefined,
+  importerFilename: string,
+  originalImportSpecifier: string,
+  reExportTarget: ReExportTarget,
+  tsconfigCache: Map<string, TsconfigInfo | null>,
+  cwd: string = process.cwd(),
+  tsconfigPathCache: Map<string, string | null> = new Map<string, string | null>(),
+): string | null {
+  // The rewritten specifier is always extensionless, which breaks projects that require explicit extensions.
+  if (hasSourceFileExtension(originalImportSpecifier)) {
+    return null;
+  }
+
+  const candidate = getCandidateSourceSpecifier(
+    options,
+    importerFilename,
+    originalImportSpecifier,
+    reExportTarget,
+    tsconfigCache,
+    cwd,
+    tsconfigPathCache,
+  );
+
+  if (candidate === null) {
+    return null;
+  }
+
+  // The candidate may come from the barrel's own config (e.g. an alias), so confirm it resolves from the importer.
+  const resolvedFromImporter = resolveImport(
+    options,
+    createResolutionCaches(tsconfigCache, tsconfigPathCache),
+    importerFilename,
+    candidate,
+    cwd,
+  );
+
+  return resolvedFromImporter === reExportTarget.resolvedFilePath ? candidate : null;
 }
 
 export function getBarrelAnalysis(

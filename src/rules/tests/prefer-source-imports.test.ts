@@ -64,6 +64,18 @@ ruleTester.run('prefer-source-imports', preferSourceImports, {
         },
       ],
     },
+    {
+      code: `import { StarFoo } from './ambiguous-star-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+    },
+    {
+      code: `import StarDefault from './star-default-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+    },
+    {
+      code: `import StarDefault from './star-default-nested-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+    },
   ],
   invalid: [
     {
@@ -335,6 +347,60 @@ ruleTester.run('prefer-source-imports', preferSourceImports, {
       errors: [{ messageId: 'preferSourceImports' }],
     },
     {
+      code: `import { Existing } from '@app/foo' with { type: 'json' };\nimport { Foo } from '@app/barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import { Existing } from '@app/foo' with { type: 'json' };\nimport { Foo } from '@app/foo';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { Foo } from '@app/barrel' with { type: 'x' };`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: null,
+      errors: [{ messageId: 'preferSourceImport' }],
+    },
+    {
+      code: `import { Foo } from './attributes-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: null,
+      errors: [{ messageId: 'preferSourceImport' }],
+    },
+    {
+      code: `import { StarFoo } from './attributes-star-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: null,
+      errors: [{ messageId: 'preferSourceImport' }],
+    },
+    {
+      code: `import { Foo } from './attributes-local-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: null,
+      errors: [{ messageId: 'preferSourceImport' }],
+    },
+    {
+      code: `import { /* why */ Foo } from '@app/barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: null,
+      errors: [{ messageId: 'preferSourceImport' }],
+    },
+    {
+      code: `import { Existing } from '@app/foo';\n// @ts-expect-error\nimport { Foo } from '@app/barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: null,
+      errors: [{ messageId: 'preferSourceImport' }],
+    },
+    {
+      code: `import { Existing /* keep */ } from '@app/foo';\nimport { Foo } from '@app/barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import { Existing /* keep */ } from '@app/foo';\nimport { Foo } from '@app/foo';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { StarFoo } from './ambiguous-star-same-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import { StarFoo } from './star';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
       code: `import { Foo } from '@acme/ui/public';`,
       filename: path.join(fixtureDirectory, 'consumer.ts'),
       options: [
@@ -352,6 +418,25 @@ ruleTester.run('prefer-source-imports', preferSourceImports, {
       filename: path.join(process.cwd(), 'src/consumer.ts'),
       options: [{ tsconfig: './src/rules/tests/fixtures/prefer-source-imports/tsconfig.json' }],
       output: `import { Foo } from '@app/foo';`,
+      errors: [{ messageId: 'preferSourceImports' }],
+    },
+    {
+      code: `import { EsmFoo } from './esm-barrel.js';`,
+      filename: path.join(fixtureDirectory, 'consumer.js'),
+      options: [{ tsconfig: false }],
+      output: null,
+      errors: [{ messageId: 'preferSourceImport' }],
+    },
+    {
+      code: `import { MismatchFoo } from './mismatch/barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: null,
+      errors: [{ messageId: 'preferSourceImport' }],
+    },
+    {
+      code: `import { StarDefaultNamed } from './star-default-nested-barrel';`,
+      filename: path.join(fixtureDirectory, 'consumer.ts'),
+      output: `import { StarDefaultNamed } from './star-default';`,
       errors: [{ messageId: 'preferSourceImports' }],
     },
     {

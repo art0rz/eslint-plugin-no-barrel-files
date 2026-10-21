@@ -18,6 +18,7 @@ export type ReExportTarget = {
   sourceSpecifier: string;
   isTypeOnly: boolean;
   fromExportAll: boolean;
+  hasAttributes?: boolean;
 };
 
 export type NamedImportSpecifier = TSESTree.ImportSpecifier & {

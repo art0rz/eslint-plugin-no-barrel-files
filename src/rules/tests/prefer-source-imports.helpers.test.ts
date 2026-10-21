@@ -35,6 +35,8 @@ function createSourceCode(code: string, filePath = path.join(originalCwd, 'test.
   return {
     ast: parseProgram(code, filePath),
     text: code,
+    getCommentsBefore: () => [],
+    getCommentsInside: () => [],
   } as any;
 }
 
@@ -1367,6 +1369,8 @@ describe('prefer-source-imports private helpers', () => {
         body: [mergeTarget, currentNode],
       },
       text: 'import { Bar as Same, Baz as Same } from "./foo";\nimport { Foo } from "./barrel";',
+      getCommentsBefore: () => [],
+      getCommentsInside: () => [],
     } as any;
 
     const fix = __private__.buildAutofix(sourceCode, currentNode, [
